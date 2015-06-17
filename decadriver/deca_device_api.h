@@ -14,52 +14,55 @@
 #ifndef _DECA_DEVICE_API_H_
 #define _DECA_DEVICE_API_H_
 
+#include <stdint.h>
+#include "deca_types.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 
-#ifndef uint8
-#ifndef _DECA_UINT8_
-#define _DECA_UINT8_
-typedef unsigned char uint8;
-#endif
-#endif
-
-#ifndef uint16
-#ifndef _DECA_UINT16_
-#define _DECA_UINT16_
-typedef unsigned short uint16;
-#endif
-#endif
-
-#ifndef uint32
-#ifndef _DECA_UINT32_
-#define _DECA_UINT32_
-typedef unsigned long uint32;
-#endif
-#endif
-
-#ifndef int8
-#ifndef _DECA_INT8_
-#define _DECA_INT8_
-typedef signed char int8;
-#endif
-#endif
-
-#ifndef int16
-#ifndef _DECA_INT16_
-#define _DECA_INT16_
-typedef signed short int16;
-#endif
-#endif
-
-#ifndef int32
-#ifndef _DECA_INT32_
-#define _DECA_INT32_
-typedef signed long int32;
-#endif
-#endif
+//#ifndef uint8_t
+//#ifndef _DECA_UINT8_
+//#define _DECA_UINT8_
+//typedef unsigned char uint8_t;
+//#endif
+//#endif
+//
+//#ifndef uint16_t
+//#ifndef _DECA_UINT16_
+//#define _DECA_UINT16_
+//typedef unsigned short uint16_t;
+//#endif
+//#endif
+//
+//#ifndef uint32_t
+//#ifndef _DECA_UINT32_
+//#define _DECA_UINT32_
+//typedef unsigned long uint32_t;
+//#endif
+//#endif
+//
+//#ifndef int8
+//#ifndef _DECA_INT8_
+//#define _DECA_INT8_
+//typedef signed char int8;
+//#endif
+//#endif
+//
+//#ifndef int16
+//#ifndef _DECA_INT16_
+//#define _DECA_INT16_
+//typedef signed short int16;
+//#endif
+//#endif
+//
+//#ifndef int32
+//#ifndef _DECA_INT32_
+//#define _DECA_INT32_
+//typedef signed long int32;
+//#endif
+//#endif
 
 #define REG_DUMP (0) //set to 1 to enable register dump functions
 #if (REG_DUMP == 1)
@@ -177,12 +180,11 @@ typedef signed long int32;
 #define DWT_OPSET_DEFLT   0x2
 
 typedef struct{
-
-	uint8 event;
-    uint8 aatset;
-	uint16 datalength;
-	uint8  fctrl[2];		//frame control bytes
-	uint8 dblbuff ;
+    uint8_t event;
+    uint8_t aatset;
+	uint16_t datalength;
+	uint8_t  fctrl[2];		//frame control bytes
+	uint8_t dblbuff ;
 
 }dwt_callback_data_t;
 
@@ -206,23 +208,23 @@ typedef enum {
 #pragma pack(1)
 typedef struct
 {
-	uint8	chan ;          //!< channel number {1, 2, 3, 4, 5, 7 }
-	uint8	prf ;           //!< Pulse Repetition Frequency {DWT_PRF_16M or DWT_PRF_64M}
+	uint8_t	chan ;          //!< channel number {1, 2, 3, 4, 5, 7 }
+	uint8_t	prf ;           //!< Pulse Repetition Frequency {DWT_PRF_16M or DWT_PRF_64M}
 
-	uint8 txPreambLength;	//!< DWT_PLEN_64..DWT_PLEN_4096
-	uint8 rxPAC ;			//!< Acquisition Chunk Size (Relates to RX preamble length)
+	uint8_t txPreambLength;	//!< DWT_PLEN_64..DWT_PLEN_4096
+	uint8_t rxPAC ;			//!< Acquisition Chunk Size (Relates to RX preamble length)
 
-	uint8 txCode ;        //!< TX preamble code
-	uint8 rxCode ;        //!< RX preamble code
+	uint8_t txCode ;        //!< TX preamble code
+	uint8_t rxCode ;        //!< RX preamble code
 
-	uint8	nsSFD ;			//!< Boolean should we use non-standard SFD for better performance
-	uint8 dataRate ;		//!< Data Rate {DWT_BR_110K, DWT_BR_850K or DWT_BR_6M8}
+	uint8_t	nsSFD ;			//!< Boolean should we use non-standard SFD for better performance
+	uint8_t dataRate ;		//!< Data Rate {DWT_BR_110K, DWT_BR_850K or DWT_BR_6M8}
 
-	uint8 phrMode ;			//!< PHR mode {0x0 - standard DWT_PHRMODE_STD, 0x3 - extended frames DWT_PHRMODE_EXT}
+	uint8_t phrMode ;			//!< PHR mode {0x0 - standard DWT_PHRMODE_STD, 0x3 - extended frames DWT_PHRMODE_EXT}
 
-	uint8	smartPowerEn ;  //!< Smart Power enable / disable
+	uint8_t	smartPowerEn ;  //!< Smart Power enable / disable
 
-	uint16 sfdTO ;			//!< SFD timeout value (in symbols)
+	uint16_t sfdTO ;			//!< SFD timeout value (in symbols)
 
 }__attribute__ ((packed))  dwt_config_t ;
 #pragma pack()
@@ -230,13 +232,13 @@ typedef struct
 
 typedef struct
 {
-	uint8	PGdly;
+	uint8_t	PGdly;
 	//TX POWER
 	//31:24		BOOST_0.125ms_PWR
 	//23:16		BOOST_0.25ms_PWR-TX_SHR_PWR
 	//15:8		BOOST_0.5ms_PWR-TX_PHR_PWR
 	//7:0		DEFAULT_PWR-TX_DATA_PWR
-	uint32	power;
+	uint32_t	power;
 }
 dwt_txconfig_t ;
 
@@ -244,15 +246,15 @@ dwt_txconfig_t ;
 typedef struct
 {
 
-	uint16		maxNoise ;			// LDE max value of noise
-	uint16		firstPathAmp1 ;	    // Amplitude at floor(index FP) + 1
-	uint16      stdNoise ;			// Standard deviation of noise
-	uint16		firstPathAmp2 ;		// Amplitude at floor(index FP) + 2
-	uint16		firstPathAmp3 ;		// Amplitude at floor(index FP) + 3
-	uint16		maxGrowthCIR ;		// Channel Impulse Response max growth CIR
-    uint16      rxPreamCount ;      // Count of preamble symbols accumulated
-    //uint32        debug1;
-    //uint32        debug2;
+	uint16_t		maxNoise ;			// LDE max value of noise
+	uint16_t		firstPathAmp1 ;	    // Amplitude at floor(index FP) + 1
+	uint16_t      stdNoise ;			// Standard deviation of noise
+	uint16_t		firstPathAmp2 ;		// Amplitude at floor(index FP) + 2
+	uint16_t		firstPathAmp3 ;		// Amplitude at floor(index FP) + 3
+	uint16_t		maxGrowthCIR ;		// Channel Impulse Response max growth CIR
+    uint16_t      rxPreamCount ;      // Count of preamble symbols accumulated
+    //uint32_t        debug1;
+    //uint32_t        debug2;
 	double      firstPath ;			// First path index
 }dwt_rxdiag_t ;
 
@@ -260,18 +262,18 @@ typedef struct
 typedef struct
 {
 	//all of the below are mapped to a 12-bit register in DW1000
-    uint16 PHE ;					//number of received header errors
-	uint16 RSL ;					//number of received frame sync loss events
-    uint16 CRCG ;					//number of good CRC received frames
-    uint16 CRCB ;					//number of bad CRC (CRC error) received frames
-	uint16 ARFE ;					//number of address filter errors
-	uint16 OVER ;					//number of receiver overflows (used in double buffer mode)
-    uint16 SFDTO ;					//SFD timeouts
-    uint16 PTO ;					//Preamble timeouts
-    uint16 RTO ;					//RX frame wait timeouts
-    uint16 TXF ;					//number of transmitted frames
-	uint16 HPW ;					//half period warn
-    uint16 TXW ;					//power up warn
+    uint16_t PHE ;					//number of received header errors
+	uint16_t RSL ;					//number of received frame sync loss events
+    uint16_t CRCG ;					//number of good CRC received frames
+    uint16_t CRCB ;					//number of bad CRC (CRC error) received frames
+	uint16_t ARFE ;					//number of address filter errors
+	uint16_t OVER ;					//number of receiver overflows (used in double buffer mode)
+    uint16_t SFDTO ;					//SFD timeouts
+    uint16_t PTO ;					//Preamble timeouts
+    uint16_t RTO ;					//RX frame wait timeouts
+    uint16_t TXF ;					//number of transmitted frames
+	uint16_t HPW ;					//half period warn
+    uint16_t TXW ;					//power up warn
 
 } dwt_deviceentcnts_t ;
 
@@ -286,7 +288,7 @@ typedef struct
  *
  * returns the 32 bit LDO tune value of the device as programmed in the factory
  */
-uint32 dwt_getldotune(void);
+uint32_t dwt_getldotune(void);
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * Function: dwt_getpartid()
@@ -299,7 +301,7 @@ uint32 dwt_getldotune(void);
  *
  * returns the 32 bit part ID value as programmed in the factory
  */
-uint32 dwt_getpartid(void);
+uint32_t dwt_getpartid(void);
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -313,7 +315,7 @@ uint32 dwt_getpartid(void);
  *
  * returns the 32 bit lot ID value as programmed in the factory
  */
-uint32 dwt_getlotid(void);
+uint32_t dwt_getlotid(void);
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -327,7 +329,7 @@ uint32 dwt_getlotid(void);
  *
  * returns the read value which for DW1000 is 0xDECA0130
  */
-uint32 dwt_readdevid(void);
+uint32_t dwt_readdevid(void);
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * @fn dwt_connect_LNA()
@@ -368,7 +370,7 @@ void dwt_connect_LNA(void);
  *
  * returns DWT_DECA_SUCCESS for success, or DWT_DECA_ERROR for error
  */
-int dwt_initialise(uint16 config) ;
+int dwt_initialise(uint16_t config) ;
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * Function: dwt_configure()
@@ -389,7 +391,7 @@ int dwt_initialise(uint16 config) ;
  *
  * returns DWT_DECA_SUCCESS for success, or DWT_DECA_ERROR for error
  */
-int dwt_configure(dwt_config_t *configData, uint8 useotp) ;
+int dwt_configure(dwt_config_t *configData, uint8_t useotp) ;
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -422,7 +424,7 @@ void dwt_configuretxrf(dwt_txconfig_t *config) ;
  *
  * returns tx power value for a given PRF and channel
  */
-uint32 dwt_getotptxpower(uint8 prf, uint8 chan);
+uint32_t dwt_getotptxpower(uint8_t prf, uint8_t chan);
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -438,7 +440,7 @@ uint32 dwt_getotptxpower(uint8 prf, uint8 chan);
  *
  * no return value
  */
-void dwt_setrxantennadelay(uint16 antennaDly);
+void dwt_setrxantennadelay(uint16_t antennaDly);
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -454,7 +456,7 @@ void dwt_setrxantennadelay(uint16 antennaDly);
  *
  * no return value
  */
-void dwt_settxantennadelay(uint16 antennaDly);
+void dwt_settxantennadelay(uint16_t antennaDly);
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -468,7 +470,7 @@ void dwt_settxantennadelay(uint16 antennaDly);
  *
  * returns the combined tx and rx antenna delay for a given PRF
  */
-uint16 dwt_readantennadelay(uint8 prf);
+uint16_t dwt_readantennadelay(uint8_t prf);
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -505,7 +507,7 @@ void dwt_setsmarttxpower(int enable);
  *
  * returns DWT_DECA_SUCCESS for success, or DWT_DECA_ERROR for error
  */
-int dwt_writetxdata(uint16 txFrameLength, uint8 *txFrameBytes, uint16 txBufferOffset) ;
+int dwt_writetxdata(uint16_t txFrameLength, uint8_t *txFrameBytes, uint16_t txBufferOffset) ;
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * Function: dwt_writetxfctrl()
@@ -524,7 +526,7 @@ int dwt_writetxdata(uint16 txFrameLength, uint8 *txFrameBytes, uint16 txBufferOf
  * returns DWT_DECA_SUCCESS for success, or DWT_DECA_ERROR for error
  *
  */
-int dwt_writetxfctrl(uint16 txFrameLength, uint16 txBufferOffset) ;
+int dwt_writetxfctrl(uint16_t txFrameLength, uint16_t txBufferOffset) ;
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * Function: dwt_starttx()
@@ -541,7 +543,7 @@ int dwt_writetxfctrl(uint16 txFrameLength, uint16 txBufferOffset) ;
  *
  * returns DWT_DECA_SUCCESS for success, or DWT_DECA_ERROR for error (e.g. a delayed transmission will fail if the delayed time has passed)
  */
-int dwt_starttx(uint8 mode) ;
+int dwt_starttx(uint8_t mode) ;
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -557,7 +559,7 @@ int dwt_starttx(uint8 mode) ;
  *
  * no return value
  */
-void dwt_setdelayedtrxtime(uint32 starttime) ;
+void dwt_setdelayedtrxtime(uint32_t starttime) ;
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -573,7 +575,7 @@ void dwt_setdelayedtrxtime(uint32 starttime) ;
  *
  * no return value
  */
-void dwt_readtxtimestamp(uint8 * timestamp);
+void dwt_readtxtimestamp(uint8_t * timestamp);
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * Function: dwt_readtxtimestamphi32()
@@ -586,7 +588,7 @@ void dwt_readtxtimestamp(uint8 * timestamp);
  *
  * returns high 32-bits of TX timestamp
  */
-uint32 dwt_readtxtimestamphi32(void);
+uint32_t dwt_readtxtimestamphi32(void);
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * Function: dwt_readtxtimestamplo32()
@@ -599,7 +601,7 @@ uint32 dwt_readtxtimestamphi32(void);
  *
  * returns low 32-bits of TX timestamp
  */
-uint32 dwt_readtxtimestamplo32(void);
+uint32_t dwt_readtxtimestamplo32(void);
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * Function: dwt_readrxtimestamp()
@@ -614,7 +616,7 @@ uint32 dwt_readtxtimestamplo32(void);
  *
  * no return value
  */
-void dwt_readrxtimestamp(uint8 * timestamp);
+void dwt_readrxtimestamp(uint8_t * timestamp);
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * Function: dwt_readrxtimestamphi32()
@@ -627,7 +629,7 @@ void dwt_readrxtimestamp(uint8 * timestamp);
  *
  * returns high 32-bits of RX timestamp
  */
-uint32 dwt_readrxtimestamphi32(void);
+uint32_t dwt_readrxtimestamphi32(void);
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * Function: dwt_readrxtimestamplo32()
@@ -640,7 +642,7 @@ uint32 dwt_readrxtimestamphi32(void);
  *
  * returns low 32-bits of RX timestamp
  */
-uint32 dwt_readrxtimestamplo32(void);
+uint32_t dwt_readrxtimestamplo32(void);
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * Function: dwt_readsystimestamphi32()
@@ -653,7 +655,7 @@ uint32 dwt_readrxtimestamplo32(void);
  *
  * returns high 32-bits of system time timestamp
  */
-uint32 dwt_readsystimestamphi32(void);
+uint32_t dwt_readsystimestamphi32(void);
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * Function: dwt_readsystime()
@@ -668,7 +670,7 @@ uint32 dwt_readsystimestamphi32(void);
  *
  * no return value
  */
-void dwt_readsystime(uint8 * timestamp);
+void dwt_readsystime(uint8_t * timestamp);
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * Function: dwt_checkoverrun()
@@ -747,7 +749,7 @@ int dwt_rxenable(int delayed) ;
 #define DWT_RX_NORMAL (0x0)
 #define DWT_RX_SNIFF  (0x1)
 
-void dwt_setrxmode(int mode, uint8 rxON, uint8 rxOFF);
+void dwt_setrxmode(int mode, uint8_t rxON, uint8_t rxOFF);
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -794,7 +796,7 @@ void dwt_setdblrxbuffmode(int enable);
  *
  * no return value
  */
-void dwt_setrxtimeout(uint16 time);
+void dwt_setrxtimeout(uint16_t time);
 
 
 
@@ -810,7 +812,7 @@ void dwt_setrxtimeout(uint16 time);
  *
  * no return value
  */
-void dwt_setpreambledetecttimeout(uint16 timeout);
+void dwt_setpreambledetecttimeout(uint16_t timeout);
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -829,7 +831,7 @@ void dwt_setpreambledetecttimeout(uint16 timeout);
  *
  * no return value
  */
-uint16 dwt_calibratesleepcnt(void);
+uint16_t dwt_calibratesleepcnt(void);
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -846,7 +848,7 @@ uint16 dwt_calibratesleepcnt(void);
  *
  * no return value
  */
- void dwt_configuresleepcnt(uint16 sleepcnt);
+ void dwt_configuresleepcnt(uint16_t sleepcnt);
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -884,7 +886,7 @@ uint16 dwt_calibratesleepcnt(void);
  *
  * no return value
  */
-void dwt_configuresleep(uint16 mode, uint8 wake);
+void dwt_configuresleep(uint16_t mode, uint8_t wake);
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -935,7 +937,7 @@ void dwt_entersleepaftertx(int enable);
  *
  * returns DWT_DECA_SUCCESS for success, or DWT_DECA_ERROR for error
  */
-int dwt_spicswakeup(uint8 *buff, uint16 length);
+int dwt_spicswakeup(uint8_t *buff, uint16_t length);
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * Function: dwt_setcallbacks()
@@ -963,7 +965,7 @@ void dwt_setcallbacks(void (*txcallback)(const dwt_callback_data_t *), void (*rx
  *
  * return value is 1 if the IRQS bit is set and 0 otherwise
  */
-uint8 dwt_checkIRQ(void);
+uint8_t dwt_checkIRQ(void);
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * Function: dwt_isr()
@@ -985,7 +987,7 @@ void dwt_isr(void);
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
- * Function: void dwt_setinterrupt( uint32 bitmask, uint8 enable)
+ * Function: void dwt_setinterrupt( uint32_t bitmask, uint8_t enable)
  *
  * Description: This function enables the specified events to trigger an interrupt.
  * The following events can be enabled:
@@ -1008,7 +1010,7 @@ void dwt_isr(void);
  *
  * no return value
  */
-void dwt_setinterrupt( uint32 bitmask, uint8 enable);
+void dwt_setinterrupt( uint32_t bitmask, uint8_t enable);
 
 
 
@@ -1025,7 +1027,7 @@ void dwt_setinterrupt( uint32 bitmask, uint8 enable);
  *
  * no return value
  */
-void dwt_setpanid(uint16 panID);
+void dwt_setpanid(uint16_t panID);
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * Function: dwt_setaddress16()
@@ -1040,7 +1042,7 @@ void dwt_setpanid(uint16 panID);
  *
  * no return value
  */
-void dwt_setaddress16(uint16 shortAddress);
+void dwt_setaddress16(uint16_t shortAddress);
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -1055,7 +1057,7 @@ void dwt_setaddress16(uint16 shortAddress);
  *
  * no return value
  */
-void dwt_seteui(uint8 *eui64);
+void dwt_seteui(uint8_t *eui64);
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * Function: dwt_geteui()
@@ -1069,7 +1071,7 @@ void dwt_seteui(uint8 *eui64);
  *
  * no return value
  */
-void dwt_geteui(uint8 *eui64);
+void dwt_geteui(uint8_t *eui64);
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * Function: dwt_enableframefilter()
@@ -1091,7 +1093,7 @@ void dwt_geteui(uint8 *eui64);
  *
  * no return value
  */
-void dwt_enableframefilter(uint16 bitmask);
+void dwt_enableframefilter(uint16_t bitmask);
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -1107,7 +1109,7 @@ void dwt_enableframefilter(uint16 bitmask);
  *
  * no return value
  */
-void dwt_enableautoack(uint8 responseDelayTime);
+void dwt_enableautoack(uint8_t responseDelayTime);
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -1122,7 +1124,7 @@ void dwt_enableautoack(uint8 responseDelayTime);
  *
  * no return value
  */
-void dwt_setrxaftertxdelay(uint32 rxDelayTime);
+void dwt_setrxaftertxdelay(uint32_t rxDelayTime);
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * Function: dwt_rxreset()
@@ -1165,7 +1167,7 @@ void dwt_softreset(void) ;
  *
  * no return value
  */
-void dwt_readrxdata(uint8 *buffer, uint16 length, uint16 rxBufferOffset);
+void dwt_readrxdata(uint8_t *buffer, uint16_t length, uint16_t rxBufferOffset);
 
 
 
@@ -1183,7 +1185,7 @@ void dwt_readrxdata(uint8 *buffer, uint16 length, uint16 rxBufferOffset);
  *
  * no return value
  */
-void dwt_readaccdata(uint8 *buffer, uint16 length, uint16 rxBufferOffset);
+void dwt_readaccdata(uint8_t *buffer, uint16_t length, uint16_t rxBufferOffset);
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -1216,7 +1218,7 @@ void dwt_readdignostics(dwt_rxdiag_t * diagnostics);
  *
  * no return value
  */
-void  dwt_loadopsettabfromotp(uint8 gtab_sel);
+void  dwt_loadopsettabfromotp(uint8_t gtab_sel);
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -1260,7 +1262,7 @@ void dwt_readeventcounters(dwt_deviceentcnts_t *counters);
  *
  * returns DWT_DECA_SUCCESS for success, or DWT_DECA_ERROR for error
  */
-uint32 dwt_otpwriteandverify(uint32 value, uint16 address);
+uint32_t dwt_otpwriteandverify(uint32_t value, uint16_t address);
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * Function: dwt_setleds()
@@ -1276,7 +1278,7 @@ uint32 dwt_otpwriteandverify(uint32 value, uint16 address);
  *
  * no return value
  */
-void dwt_setleds(uint8 test) ;
+void dwt_setleds(uint8_t test) ;
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -1291,7 +1293,7 @@ void dwt_setleds(uint8 test) ;
  *
  * no return value
  */
-void dwt_xtaltrim(uint8 value);
+void dwt_xtaltrim(uint8_t value);
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -1306,7 +1308,7 @@ void dwt_xtaltrim(uint8 value);
  *
  * returns DWT_DECA_SUCCESS for success, or DWT_DECA_ERROR for error
  */
-int dwt_configcwmode(uint8 chan);
+int dwt_configcwmode(uint8_t chan);
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -1321,7 +1323,7 @@ int dwt_configcwmode(uint8 chan);
  *
  * no return value
  */
-void dwt_configcontinuousframemode(uint32 framerepetitionrate);
+void dwt_configcontinuousframemode(uint32_t framerepetitionrate);
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -1345,7 +1347,7 @@ void dwt_configcontinuousframemode(uint32 framerepetitionrate);
  *
  * returns  (temp_raw<<8)|(vbat_raw)
  */
-uint16 dwt_readtempvbat(uint8 fastSPI);
+uint16_t dwt_readtempvbat(uint8_t fastSPI);
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -1361,7 +1363,7 @@ uint16 dwt_readtempvbat(uint8 fastSPI);
  *
  * returns: 8-bit raw temperature sensor value
  */
-uint8 dwt_readwakeuptemp(void) ;
+uint8_t dwt_readwakeuptemp(void) ;
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -1377,7 +1379,7 @@ uint8 dwt_readwakeuptemp(void) ;
  *
  * returns: 8-bit raw battery voltage sensor value
  */
-uint8 dwt_readwakeupvbat(void) ;
+uint8_t dwt_readwakeupvbat(void) ;
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -1405,10 +1407,10 @@ uint8 dwt_readwakeupvbat(void) ;
  */
 int dwt_writetodevice             // returns 0 for success, or, -1 for error.
 (
-    uint16      recordNumber,   // input parameter - ID of register file or buffer being accessed
-    uint16      index,          // input parameter - byte index into register file or buffer being accessed
-    uint32      length,         // input parameter - number of bytes being written
-    const uint8 *buffer         // input parameter - pointer to buffer containing the 'length' bytes to be written
+    uint16_t      recordNumber,   // input parameter - ID of register file or buffer being accessed
+    uint16_t      index,          // input parameter - byte index into register file or buffer being accessed
+    uint32_t      length,         // input parameter - number of bytes being written
+    const uint8_t *buffer         // input parameter - pointer to buffer containing the 'length' bytes to be written
 ) ;
 
 
@@ -1437,10 +1439,10 @@ int dwt_writetodevice             // returns 0 for success, or, -1 for error.
  */
 int dwt_readfromdevice            // returns offset where requested data begins in supplied buffer, or, -1 for error.
 (
-    uint16  recordNumber,       // input parameter - ID of register file or buffer being accessed
-    uint16  index,              // input parameter - byte index into register file or buffer being accessed
-    uint32  length,             // input parameter - number of bytes being read
-    uint8   *buffer             // input parameter - pointer to buffer in which to return the read data.
+    uint16_t  recordNumber,       // input parameter - ID of register file or buffer being accessed
+    uint16_t  index,              // input parameter - byte index into register file or buffer being accessed
+    uint32_t  length,             // input parameter - number of bytes being read
+    uint8_t   *buffer             // input parameter - pointer to buffer in which to return the read data.
 ) ;
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -1456,7 +1458,7 @@ int dwt_readfromdevice            // returns offset where requested data begins 
  *
  * returns 32 bit register value (success), or DWT_DECA_ERROR for error
  */
-uint32 dwt_read32bitoffsetreg(int regFileID, int regOffset) ;
+uint32_t dwt_read32bitoffsetreg(int regFileID, int regOffset) ;
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * Function: dwt_write32bitoffsetreg()
@@ -1472,7 +1474,7 @@ uint32 dwt_read32bitoffsetreg(int regFileID, int regOffset) ;
  *
  * returns DWT_DECA_SUCCESS for success, or DWT_DECA_ERROR for error
  */
-int dwt_write32bitoffsetreg(int regFileID, int regOffset, uint32 regval);
+int dwt_write32bitoffsetreg(int regFileID, int regOffset, uint32_t regval);
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * Function: dwt_read16bitoffsetreg()
@@ -1487,7 +1489,7 @@ int dwt_write32bitoffsetreg(int regFileID, int regOffset, uint32 regval);
  *
  * returns 16 bit register value (success), or DWT_DECA_ERROR for error
  */
-uint16 dwt_read16bitoffsetreg(int regFileID, int regOffset);
+uint16_t dwt_read16bitoffsetreg(int regFileID, int regOffset);
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * Function: dwt_write16bitoffsetreg()
@@ -1503,7 +1505,7 @@ uint16 dwt_read16bitoffsetreg(int regFileID, int regOffset);
  *
  * returns DWT_DECA_SUCCESS for success, or DWT_DECA_ERROR for error
  */
-int dwt_write16bitoffsetreg(int regFileID, int regOffset, uint16 regval) ;
+int dwt_write16bitoffsetreg(int regFileID, int regOffset, uint16_t regval) ;
 
 #define dwt_write32bitreg(x,y)	dwt_write32bitoffsetreg(x,0,y)
 #define dwt_read32bitreg(x)		dwt_read32bitoffsetreg(x,0)
@@ -1531,13 +1533,13 @@ int dwt_write16bitoffsetreg(int regFileID, int regOffset, uint16 regval) ;
  *
  * returns DWT_DECA_SUCCESS for success, or DWT_DECA_ERROR for error
  */
-extern int writetospi                          // returns 0 for success, or, -1 for error.
-(
-    uint16       headerLength,          // input parameter - number of bytes header being written
-    const uint8 *headerBuffer,          // input parameter - pointer to buffer containing the 'headerLength' bytes of header to be written
-    uint32       bodylength,            // input parameter - number of bytes data being written
-    const uint8 *bodyBuffer             // input parameter - pointer to buffer containing the 'bodylength' bytes od data to be written
-) ;
+//extern int writetospi                          // returns 0 for success, or, -1 for error.
+//(
+//    uint16_t       headerLength,          // input parameter - number of bytes header being written
+//    const uint8_t *headerBuffer,          // input parameter - pointer to buffer containing the 'headerLength' bytes of header to be written
+//    uint32_t       bodylength,            // input parameter - number of bytes data being written
+//    const uint8_t *bodyBuffer             // input parameter - pointer to buffer containing the 'bodylength' bytes od data to be written
+//) ;
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -1562,13 +1564,13 @@ extern int writetospi                          // returns 0 for success, or, -1 
  *
  * returns DWT_DECA_SUCCESS for success (and the position in the buffer at which data begins), or DWT_DECA_ERROR for error
  */
-extern int readfromspi                         // returns offset where requested data begins in supplied buffer, or, -1 for error.
-(
-    uint16       headerLength,          // input parameter - number of bytes header to write
-    const uint8 *headerBuffer,          // input parameter - pointer to buffer containing the 'headerLength' bytes of header to write
-    uint32       readlength,            // input parameter - number of bytes data being read
-    uint8       *readBuffer             // input parameter - pointer to buffer containing to return the data (NB: size required = headerLength + readlength)
-) ;
+//extern int readfromspi                         // returns offset where requested data begins in supplied buffer, or, -1 for error.
+//(
+//    uint16_t       headerLength,          // input parameter - number of bytes header to write
+//    const uint8_t *headerBuffer,          // input parameter - pointer to buffer containing the 'headerLength' bytes of header to write
+//    uint32_t       readlength,            // input parameter - number of bytes data being read
+//    uint8_t       *readBuffer             // input parameter - pointer to buffer containing to return the data (NB: size required = headerLength + readlength)
+//) ;
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -1585,7 +1587,7 @@ extern int readfromspi                         // returns offset where requested
  *
  * returns correction needed in meters
  */
-double dwt_getrangebias(uint8 chan, float range, uint8 prf);
+double dwt_getrangebias(uint8_t chan, float range, uint8_t prf);
 
 
 // ---------------------------------------------------------------------------

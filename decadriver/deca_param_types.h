@@ -29,26 +29,26 @@ extern "C" {
 
 
 typedef struct {
-		uint32 lo32;
-		uint16 target[NUM_PRF];
+		uint32_t lo32;
+		uint16_t target[NUM_PRF];
 } agc_cfg_struct ;
 
 extern const agc_cfg_struct agc_config ;
 
 //SFD threshold settings for 110k, 850k, 6.8Mb standard and non-standard
-extern const uint16 sftsh[NUM_BR][NUM_SFD]; 
+extern const uint16_t sftsh[NUM_BR][NUM_SFD];
 
-extern const uint16 dtune1[NUM_PRF];
+extern const uint16_t dtune1[NUM_PRF];
 
 #define XMLPARAMS_VERSION	(1.17f)
 
-extern const uint8 pll2_config[NUM_CH][5];
-extern const uint8 pll2calcfg;
-extern const uint8 rx_config[NUM_BW];
-extern const uint32 tx_config[NUM_CH];
-extern const uint8 dwnsSFDlen[NUM_BR];				//length of SFD for each of the bitrates
-extern const uint32 digital_bb_config[NUM_PRF][NUM_PACS];
-extern const uint8 chan_idx[NUM_CH_SUPPORTED];
+extern const uint8_t pll2_config[NUM_CH][5];
+extern const uint8_t pll2calcfg;
+extern const uint8_t rx_config[NUM_BW];
+extern const uint32_t tx_config[NUM_CH];
+extern const uint8_t dwnsSFDlen[NUM_BR];				//length of SFD for each of the bitrates
+extern const uint32_t digital_bb_config[NUM_PRF][NUM_PACS];
+extern const uint8_t chan_idx[NUM_CH_SUPPORTED];
 
 #define PEAK_MULTPLIER (0x60)	//3 -> (0x3 * 32) & 0x00E0 
 #define N_STD_FACTOR (13)
@@ -57,7 +57,7 @@ extern const uint8 chan_idx[NUM_CH_SUPPORTED];
 #define LDE_PARAM3_16 (0x1607)
 #define LDE_PARAM3_64 (0x0607)
 
-extern const uint16 lde_replicaCoeff[PCODES];
+extern const uint16_t lde_replicaCoeff[PCODES];
 
 #ifdef __cplusplus
 }

@@ -21,10 +21,10 @@
 //-----------------------------------------
 // map the channel number to the index in the configuration arrays below
 // 0th element is chan 1, 1st is chan 2, 2nd is chan 3, 3rd is chan 4, 4th is chan 5, 5th is chan 7
-const uint8 chan_idx[NUM_CH_SUPPORTED] = {0, 0, 1, 2, 3, 4, 0, 5};
+const uint8_t chan_idx[NUM_CH_SUPPORTED] = {0, 0, 1, 2, 3, 4, 0, 5};
 
 //-----------------------------------------
-const uint32 tx_config[NUM_CH] =
+const uint32_t tx_config[NUM_CH] =
 {
         RF_TXCTRL_CH1,      /* Tx value match UM */
         RF_TXCTRL_CH2,
@@ -35,7 +35,7 @@ const uint32 tx_config[NUM_CH] =
 };
 
 //RF -> Channel_Specific_Cfg -> Channel_Cfg -> RF_PLL -> RF PLL2
-const uint8 pll2_config[NUM_CH][5] =
+const uint8_t pll2_config[NUM_CH][5] =
 {
     { 0x07, 0x04, 0x00, 0x09, 0x1E}, //3.5Ghz
 
@@ -50,11 +50,11 @@ const uint8 pll2_config[NUM_CH][5] =
     { 0x1D, 0x04, 0x00, 0x08, 0xA6} //6.5Ghz WBW
 };
 
-const uint8 pll2calcfg = (0x60 | 0x10) ;    /* Bits 7:5 must always be set to binary “011”. Failure to maintain this value will result in DW1000 malfunction. */
+const uint8_t pll2calcfg = (0x60 | 0x10) ;    /* Bits 7:5 must always be set to binary “011”. Failure to maintain this value will result in DW1000 malfunction. */
 
 
 //bandwidth configuration
-const uint8 rx_config[NUM_BW] =
+const uint8_t rx_config[NUM_BW] =
 {
     0xD8,   //NBW
     0xBC    //WBW
@@ -69,10 +69,10 @@ const agc_cfg_struct agc_config =
 };
 
 
-const uint8 dwnsSFDlen[NUM_BR] = { 0x40, 0x10, 0x08 }; //DW non-standard SFD length for 110k, 850k and 6.81M
+const uint8_t dwnsSFDlen[NUM_BR] = { 0x40, 0x10, 0x08 }; //DW non-standard SFD length for 110k, 850k and 6.81M
 
 // SFD Threshold
-const uint16 sftsh[NUM_BR][NUM_SFD] =
+const uint16_t sftsh[NUM_BR][NUM_SFD] =
 {
     //110k
     {
@@ -91,13 +91,13 @@ const uint16 sftsh[NUM_BR][NUM_SFD] =
     }
 };
 
-const uint16 dtune1[NUM_PRF] =
+const uint16_t dtune1[NUM_PRF] =
 {
     0x0087, // 16 MHz PRF
     0x008D //  64 MHz PRF
 };
 
-const uint32 digital_bb_config[NUM_PRF][NUM_PACS] =
+const uint32_t digital_bb_config[NUM_PRF][NUM_PACS] =
     {
         //16 PRF
         {
@@ -123,7 +123,7 @@ const uint32 digital_bb_config[NUM_PRF][NUM_PACS] =
         }
 };
 
-const uint16 lde_replicaCoeff[PCODES] = {
+const uint16_t lde_replicaCoeff[PCODES] = {
 
     // 0
     (int)(0.0 * 65536),
