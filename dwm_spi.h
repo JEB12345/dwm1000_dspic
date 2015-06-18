@@ -10,6 +10,7 @@
 
 #include "decadriver/deca_types.h"
 #include "decadriver/deca_device_api.h"
+#include "dwm_mutex.h"
 #include "../sensor_spi2.h"
 #include "../sensor_pindefs.h"
 
@@ -22,8 +23,8 @@ extern dwm_1000_status dwm_status;
  */
 #define DWT_PRF_64M_RFDLY 514.462f
 
-//#define TAG 1
-//#define ANCHOR 2
+#define TAG 1
+#define ANCHOR 2
 
 //#define DW_DEBUG
 //#define DW_CAL_TRX_DELAY
@@ -48,14 +49,13 @@ extern dwm_1000_status dwm_status;
 #define NUM_ANCHORS 1
 
 #define DW1000_PANID 0xD100
-
+#define SPEED_OF_LIGHT 299702547.0
 #define NODE_DELAY_US 6500
 #define ANC_RESP_DELAY 1000
 #define DELAY_MASK 0x00FFFFFFFE00
-#define NUM_ANTENNAS 2
-#define NUM_CHANNELS 2
-#define SUBSEQUENCE_PERIOD (RTIMER_SECOND*0.110)
-#define SEQUENCE_WAIT_PERIOD (RTIMER_SECOND)
+#define NUM_ANTENNAS 1
+#define NUM_CHANNELS 1
+
 
 /*****https://github.com/lab11/polypoint******/
 
@@ -75,7 +75,7 @@ typedef struct
 extern "C" {
 #endif
 
-    uint8_t dwm_init(int mode);
+    uint8_t dwm_init();
 
     /**
      * This function takes the information provided by the decaWave DWM1000 API
@@ -129,7 +129,21 @@ extern "C" {
      * https://github.com/lab11/polypoint
      */
     void dw1000_populate_eui (uint8_t *eui_buf, uint8_t id);
+
+    void app_dw1000_txcallback (const dwt_callback_data_t *txd);
+
+    void app_dw1000_rxcallback (const dwt_callback_data_t *rxd);
+
+    void send_poll();
+
+    void instance_process();
+
+    void incr_subsequence_counter();
     /*****https://github.com/lab11/polypoint******/
+
+    uint32_t convertmicrosectodevicetimeu32 (double microsecu);
+
+    void instancesettagsleepdelay(int sleepdelay, int blinksleepdelay);
 
 #ifdef	__cplusplus
 }

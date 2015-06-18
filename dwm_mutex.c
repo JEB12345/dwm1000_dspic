@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <xc.h>
 #include "decadriver/deca_device_api.h"
 #include "../sensor_pindefs.h"
 

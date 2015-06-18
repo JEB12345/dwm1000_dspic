@@ -15,7 +15,6 @@
 #define _DECA_DEVICE_API_H_
 
 #include <stdint.h>
-#include "deca_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -63,6 +62,14 @@ extern "C" {
 //typedef signed long int32;
 //#endif
 //#endif
+
+#ifndef FALSE
+#define FALSE               0
+#endif
+
+#ifndef TRUE
+#define TRUE                1
+#endif
 
 #define REG_DUMP (0) //set to 1 to enable register dump functions
 #if (REG_DUMP == 1)

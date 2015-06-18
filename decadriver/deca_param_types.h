@@ -16,7 +16,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#include "deca_types.h"
+#include <stdint.h>
 
 #define NUM_BR 3
 #define NUM_PRF 2

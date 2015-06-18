@@ -18,9 +18,6 @@
 extern "C" {
 #endif
 
-#include <stdint.h>
-#include <xc.h>
-
 //#ifndef uint8
 //#ifndef _DECA_UINT8_
 //#define _DECA_UINT8_
