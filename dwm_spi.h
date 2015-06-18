@@ -15,6 +15,50 @@
 
 extern dwm_1000_status dwm_status;
 
+/**
+ * Code Copied directly or modified
+ * from polypoint github code
+ * https://github.com/lab11/polypoint
+ */
+#define DWT_PRF_64M_RFDLY 514.462f
+
+//#define TAG 1
+//#define ANCHOR 2
+
+//#define DW_DEBUG
+//#define DW_CAL_TRX_DELAY
+
+// 4 packet types
+#define MSG_TYPE_TAG_POLL   0x61
+#define MSG_TYPE_ANC_RESP   0x50
+#define MSG_TYPE_TAG_FINAL  0x69
+#define MSG_TYPE_ANC_FINAL  0x51
+
+#ifdef IS_ANCHOR
+#define DW1000_ROLE_TYPE ANCHOR
+#endif
+#ifdef IS_TAG
+#define DW1000_ROLE_TYPE TAG
+#endif
+
+#define ANCHOR_CAL_LEN (0.914-0.18) //0.18 is post-over-air calibration
+
+#define TAG_EUI 0
+#define ANCHOR_EUI 10
+#define NUM_ANCHORS 1
+
+#define DW1000_PANID 0xD100
+
+#define NODE_DELAY_US 6500
+#define ANC_RESP_DELAY 1000
+#define DELAY_MASK 0x00FFFFFFFE00
+#define NUM_ANTENNAS 2
+#define NUM_CHANNELS 2
+#define SUBSEQUENCE_PERIOD (RTIMER_SECOND*0.110)
+#define SEQUENCE_WAIT_PERIOD (RTIMER_SECOND)
+
+/*****https://github.com/lab11/polypoint******/
+
 typedef struct
 {
     uint8_t channel ;
@@ -78,6 +122,14 @@ extern "C" {
      * @param num_bytes: length of the data to be written
      */
     void write_data_SPI(const uint8_t* data, uint16_t num_bytes);
+
+    /**
+     * Code Copied directly or modified
+     * from polypoint github code
+     * https://github.com/lab11/polypoint
+     */
+    void dw1000_populate_eui (uint8_t *eui_buf, uint8_t id);
+    /*****https://github.com/lab11/polypoint******/
 
 #ifdef	__cplusplus
 }
