@@ -460,7 +460,7 @@ int dwt_configure(dwt_config_t *config, uint8_t use_otpconfigvalues)
 
     dw1000local.longFrames = config->phrMode ;
 
-    dw1000local.sysCFGreg |= (SYS_CFG_PHR_MODE_11 & (config->phrMode << 16)) ;
+    dw1000local.sysCFGreg |= (SYS_CFG_PHR_MODE_11 & (((uint32_t)config->phrMode) << 16)) ;
 
     dwt_write32bitreg(SYS_CFG_ID,dw1000local.sysCFGreg) ;
     //write/set the lde_replicaCoeff
@@ -531,22 +531,22 @@ int dwt_configure(dwt_config_t *config, uint8_t use_otpconfigvalues)
          nsSfd_result = 3 ;
          useDWnsSFD = 1 ;
     }
-    regval =  (CHAN_CTRL_TX_CHAN_MASK & (chan << CHAN_CTRL_TX_CHAN_SHIFT)) |            // Transmit Channel
-              (CHAN_CTRL_RX_CHAN_MASK & (chan << CHAN_CTRL_RX_CHAN_SHIFT)) |            // Receive Channel
-              (CHAN_CTRL_RXFPRF_MASK & (config->prf << CHAN_CTRL_RXFPRF_SHIFT)) |     // RX PRF
-              ((CHAN_CTRL_TNSSFD|CHAN_CTRL_RNSSFD) & (nsSfd_result << CHAN_CTRL_TNSSFD_SHIFT)) |       // nsSFD enable RX&TX
-              (CHAN_CTRL_DWSFD & (useDWnsSFD << CHAN_CTRL_DWSFD_SHIFT)) |      // use DW nsSFD
-              (CHAN_CTRL_TX_PCOD_MASK & (config->txCode << CHAN_CTRL_TX_PCOD_SHIFT)) |  // TX Preamble Code
-              (CHAN_CTRL_RX_PCOD_MASK & (config->rxCode << CHAN_CTRL_RX_PCOD_SHIFT)) ;  // RX Preamble Code
+    regval =  (CHAN_CTRL_TX_CHAN_MASK & (((uint32_t)chan) << CHAN_CTRL_TX_CHAN_SHIFT)) |            // Transmit Channel
+              (CHAN_CTRL_RX_CHAN_MASK & (((uint32_t)chan) << CHAN_CTRL_RX_CHAN_SHIFT)) |            // Receive Channel
+              (CHAN_CTRL_RXFPRF_MASK & (((uint32_t)config->prf) << CHAN_CTRL_RXFPRF_SHIFT)) |     // RX PRF
+              ((CHAN_CTRL_TNSSFD|CHAN_CTRL_RNSSFD) & (((uint32_t)nsSfd_result) << CHAN_CTRL_TNSSFD_SHIFT)) |       // nsSFD enable RX&TX
+              (CHAN_CTRL_DWSFD & (((uint32_t)useDWnsSFD) << CHAN_CTRL_DWSFD_SHIFT)) |      // use DW nsSFD
+              (CHAN_CTRL_TX_PCOD_MASK & (((uint32_t)config->txCode) << CHAN_CTRL_TX_PCOD_SHIFT)) |  // TX Preamble Code
+              (CHAN_CTRL_RX_PCOD_MASK & (((uint32_t)config->rxCode) << CHAN_CTRL_RX_PCOD_SHIFT)) ;  // RX Preamble Code
 
     dwt_write32bitreg(CHAN_CTRL_ID,regval) ;
 
     // Set up TX Preamble Size and TX PRF
     // Set up TX Ranging Bit and Data Rate
     {
-        uint32_t x = (config->txPreambLength | config->prf)  <<  16;
+        uint32_t x = ((uint32_t)(config->txPreambLength | config->prf))  <<  16;
         dw1000local.txFCTRL = x | TX_FCTRL_TR |     /* always set ranging bit !!! */
-                                (config->dataRate << TX_FCTRL_TXBR_SHFT) ;
+                                (((uint32_t)config->dataRate) << TX_FCTRL_TXBR_SHFT) ;
 
         dwt_write32bitoffsetreg(TX_FCTRL_ID,0,dw1000local.txFCTRL) ;
     }
@@ -708,7 +708,7 @@ int dwt_writetxfctrl(uint16_t txFrameLength, uint16_t txBufferOffset)
 
     // write the frame length to the TX frame control register
     // dw1000local.txFCTRL has kept configured bit rate information
-    uint32_t reg32 = dw1000local.txFCTRL | txFrameLength | (txBufferOffset << 22);
+    uint32_t reg32 = dw1000local.txFCTRL | txFrameLength | (((uint32_t)txBufferOffset) << 22);
     dwt_write32bitoffsetreg(TX_FCTRL_ID,0,reg32) ;
 
     return DWT_SUCCESS ;
@@ -780,7 +780,7 @@ void dwt_readdignostics(dwt_rxdiag_t *diagnostics)
     //LDE result 0 is in bytes 40->55
     // convert (and save) hardware estimate to show on graph
     fp = reg[0];
-    fp = fp + (reg[1] << 8);
+    fp = fp + (((uint16_t)reg[1]) << 8);
     diagnostics->firstPath = (double) fp * (1.0/64.0) ;
 
     //LDE diagnostic data
@@ -1137,7 +1137,7 @@ uint16_t dwt_read16bitoffsetreg(int regFileID,int regOffset)
 
     if(result == DWT_SUCCESS)
     {
-        regval = (buffer[1] << 8) + buffer[0] ;        // sum
+        regval = (((uint16_t)buffer[1]) << 8) + buffer[0] ;        // sum
     }
     return regval ;
 
