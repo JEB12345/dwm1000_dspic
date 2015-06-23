@@ -45,7 +45,7 @@ extern dwm_1000_status dwm_status;
 #define ANCHOR_CAL_LEN (0.914-0.18) //0.18 is post-over-air calibration
 
 #define TAG_EUI 0
-#define ANCHOR_EUI 10
+#define ANCHOR_EUI 1
 #define NUM_ANCHORS 1
 
 #define DW1000_PANID 0xD100

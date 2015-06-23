@@ -96,7 +96,7 @@ dwm_1000_status dwm_status;
     uint64_t global_tRF = 0;
     uint8_t global_recv_pkt[512];
 
-    uint32_t global_subseq_num = 0xFFFFFFFF;
+    uint32_t global_subseq_num = 0x0;
     uint8_t global_chan = 1;
     float global_distances[NUM_ANCHORS*NUM_ANTENNAS*NUM_ANTENNAS*NUM_CHANNELS];
 
@@ -166,7 +166,7 @@ uint8_t dwm_init()
 
     // Setup interrupts
     // Note: using auto rx re-enable so don't need to trigger on error frames
-    dwt_setinterrupt(DWT_INT_TFRS |
+    dwt_setinterrupt(//DWT_INT_TFRS |
                      DWT_INT_RFCG |
                      DWT_INT_SFDT |
                      DWT_INT_RFTO |
@@ -186,20 +186,20 @@ uint8_t dwm_init()
      * https://github.com/lab11/polypoint
      */
     // Set the parameters of ranging and channel and whatnot
-    global_ranging_config.chan           = 2;
-    global_ranging_config.prf            = DWT_PRF_64M;
-    global_ranging_config.txPreambLength = DWT_PLEN_4096;//DWT_PLEN_4096
-    // global_ranging_config.txPreambLength = DWT_PLEN_256;
-    global_ranging_config.rxPAC          = DWT_PAC64;
-    global_ranging_config.txCode         = 9;  // preamble code
-    global_ranging_config.rxCode         = 9;  // preamble code
-    global_ranging_config.nsSFD          = 1;
-    global_ranging_config.dataRate       = DWT_BR_110K;
-    global_ranging_config.phrMode        = DWT_PHRMODE_EXT; //Enable extended PHR mode (up to 1024-byte packets)
-    global_ranging_config.smartPowerEn   = 0;
-    global_ranging_config.sfdTO          = 4096+64+1;//(1025 + 64 - 32);
-    dwt_configure(&global_ranging_config, 0);
-    
+//    global_ranging_config.chan           = 2;
+//    global_ranging_config.prf            = DWT_PRF_64M;
+//    global_ranging_config.txPreambLength = DWT_PLEN_4096;//DWT_PLEN_4096
+//    // global_ranging_config.txPreambLength = DWT_PLEN_256;
+//    global_ranging_config.rxPAC          = DWT_PAC64;
+//    global_ranging_config.txCode         = 9;  // preamble code
+//    global_ranging_config.rxCode         = 9;  // preamble code
+//    global_ranging_config.nsSFD          = 1;
+//    global_ranging_config.dataRate       = DWT_BR_110K;
+//    global_ranging_config.phrMode        = DWT_PHRMODE_EXT; //Enable extended PHR mode (up to 1024-byte packets)
+//    global_ranging_config.smartPowerEn   = 0;
+//    global_ranging_config.sfdTO          = 4096+64+1;//(1025 + 64 - 32);
+//    dwt_configure(&global_ranging_config, 0);
+//
     // Configure TX power
     {
         global_tx_config.PGdly = pgDelay[global_ranging_config.chan];
@@ -252,7 +252,7 @@ uint8_t dwm_init()
     // Calculate the delay between packet reception and transmission.
     // This applies to the time between POLL and RESPONSE (on the anchor side)
     // and RESPONSE and POLL (on the tag side).
-    global_pkt_delay_upper32 = (convertmicrosectodevicetimeu32(NODE_DELAY_US) & DELAY_MASK) >> 8;
+//    global_pkt_delay_upper32 = (convertmicrosectodevicetimeu32(NODE_DELAY_US) & DELAY_MASK) >> 8;
 
     if (DW1000_ROLE_TYPE == ANCHOR) {
 	uint8_t eui_array[8];
@@ -615,7 +615,7 @@ void send_poll(){
     dwt_writetxfctrl(tx_frame_length, 0);
 
     // We'll get multiple responses, so let them all come in
-    dwt_setrxtimeout(NODE_DELAY_US*NUM_ANCHORS);
+//    dwt_setrxtimeout(NODE_DELAY_US*NUM_ANCHORS);
 
     // Delay RX?
     dwt_setrxaftertxdelay(0); // us
@@ -638,7 +638,7 @@ void send_poll(){
 }
 
 void instance_process(){
-    incr_subsequence_counter();
+//    incr_subsequence_counter();
     if(DW1000_ROLE_TYPE == TAG){
         if(global_subseq_num < NUM_ANTENNAS*NUM_ANTENNAS*NUM_CHANNELS){
             //Make sure we're out of rx mode before attempting to transmit
@@ -663,13 +663,14 @@ void instance_process(){
             dwt_writetxdata(sizeof(fin_msg), (uint8_t*) &fin_msg, 0);
             dwt_starttx(DWT_START_TX_DELAYED);
             dwt_settxantennadelay(global_tx_antenna_delay);
+            incr_subsequence_counter();
         }
     }
 }
 
 void incr_subsequence_counter(){
     global_subseq_num++;
-    if(global_subseq_num >= NUM_ANTENNAS*NUM_ANTENNAS*NUM_CHANNELS+1){
+    if(global_subseq_num > NUM_ANTENNAS*NUM_ANTENNAS*NUM_CHANNELS+1){
         global_subseq_num = 0;
     }
 }
