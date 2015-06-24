@@ -20,6 +20,7 @@
 extern "C" {
 #endif
 
+//#define DWT_API_ERROR_CHECK
 
 //#ifndef uint8_t
 //#ifndef _DECA_UINT8_

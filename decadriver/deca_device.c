@@ -563,6 +563,9 @@ int dwt_configure(dwt_config_t *config, uint8_t use_otpconfigvalues)
         dwt_settxantennadelay(((dw1000local.antennaDly >> (16*prfIndex)) & 0xFFFF) >> 1);
     }
 
+    dwt_write32bitreg(0x24,(uint32_t)0b100) ;
+    
+    
     return DWT_SUCCESS ;
 
 } // end dwt_configure()
@@ -2173,9 +2176,10 @@ void dwt_setcallbacks(void (*txcallback)(const dwt_callback_data_t *), void (*rx
 
 void dwt_isr(void) // assume interrupt can supply context
 {
-    uint32_t  status = 0;
+    volatile uint32_t  status = 0;
     uint32_t  clear = 0; // will clear any events seen
-
+    uint32_t statusOK=0;
+    
 #if (DEBUGx==1)
     uint32_t status1 = 0;
     uint32_t states = 0;
@@ -2186,6 +2190,18 @@ void dwt_isr(void) // assume interrupt can supply context
 	dw1000local.cdata.dblbuff = dw1000local.dblbuffon ;
 
     status = dwt_read32bitreg(SYS_STATUS_ID) ;            // read status register low 32bits
+    statusOK = status;
+//    if((status&SYS_STATUS_RXDFR) || (status& SYS_STATUS_RXPHE)){
+//           // statusOK = dwt_read32bitreg(SYS_STATUS_ID) ;
+//        while(1){
+//            #define RGB_RED     LATGbits.LATG8
+//#define RGB_BLUE    LATGbits.LATG6
+//#define RGB_GREEN   LATAbits.LATA0
+//            RGB_RED = 1;
+//            RGB_GREEN = 0;
+//            RGB_BLUE = 1;
+//        }
+//    }
 
     //NOTES:
     //1. TX Event - if DWT_INT_TFRS is enabled, then when the frame has completed transmission the interrupt will be triggered.
@@ -2242,6 +2258,7 @@ void dwt_isr(void) // assume interrupt can supply context
     //
     if(status & SYS_STATUS_RXFCG) // Receiver FCS Good
 		{
+
 		if(status & SYS_STATUS_LDEDONE)  // LDE done/finished
 			{ 
 			// bug 634 - overrun overwrites the frame info data... so both frames should be discarded
@@ -2275,6 +2292,15 @@ void dwt_isr(void) // assume interrupt can supply context
 			}
 			else //no overrun condition - proceed to process the frame
 			{
+                
+//                        while(1){
+//            #define RGB_RED     LATGbits.LATG8
+//#define RGB_BLUE    LATGbits.LATG6
+//#define RGB_GREEN   LATAbits.LATA0
+//            RGB_RED = 1;
+//            RGB_GREEN = 0;
+//            RGB_BLUE = 1;
+//        }
 			
 			len = dwt_read16bitoffsetreg(RX_FINFO_ID, 0) & 0x3FF;
 	        dwt_readfromdevice(RX_BUFFER_ID,0,2,dw1000local.cdata.fctrl) ;

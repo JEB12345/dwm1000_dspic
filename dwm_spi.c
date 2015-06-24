@@ -173,7 +173,7 @@ uint8_t dwm_init()
                      DWT_INT_RPHE |
                      DWT_INT_RFCE |
                      DWT_INT_RFSL |
-                     DWT_INT_RXPTO |
+                     DWT_INT_RXPTO | DWT_INT_ARFE |  DWT_INT_LDED | DWT_INT_RXOVRR |
                      DWT_INT_SFDT, 1);
 
     // Configure the callbacks from the dwt library
@@ -200,6 +200,21 @@ uint8_t dwm_init()
 //    global_ranging_config.sfdTO          = 4096+64+1;//(1025 + 64 - 32);
 //    dwt_configure(&global_ranging_config, 0);
 //
+    
+        global_ranging_config.chan           = 5;
+        global_ranging_config.prf            = DWT_PRF_16M;
+        global_ranging_config.txPreambLength = DWT_PLEN_128;//DWT_PLEN_4096
+        // global_ranging_config.txPreambLength = DWT_PLEN_256;
+        global_ranging_config.rxPAC          = DWT_PAC8; //?
+        global_ranging_config.txCode         = 4;  // preamble code
+        global_ranging_config.rxCode         = 4;  // preamble code
+        global_ranging_config.nsSFD          = 0; //?
+        global_ranging_config.dataRate       = DWT_BR_6M8;
+        global_ranging_config.phrMode        = DWT_PHRMODE_STD;//? //Enable extended PHR mode (up to 1024-byte packets)
+        global_ranging_config.smartPowerEn   = 0;
+        global_ranging_config.sfdTO          = 4096+64+1;//(1025 + 64 - 32);
+        dwt_configure(&global_ranging_config, 0);
+    dwt_configeventcounters(1);
     // Configure TX power
     {
         global_tx_config.PGdly = pgDelay[global_ranging_config.chan];
@@ -254,6 +269,8 @@ uint8_t dwm_init()
     // and RESPONSE and POLL (on the tag side).
 //    global_pkt_delay_upper32 = (convertmicrosectodevicetimeu32(NODE_DELAY_US) & DELAY_MASK) >> 8;
 
+    
+    
     if (DW1000_ROLE_TYPE == ANCHOR) {
 	uint8_t eui_array[8];
 
@@ -630,7 +647,8 @@ void send_poll(){
     dwt_writetxdata(tx_frame_length, (uint8_t*) &bcast_msg, 0);
 
     // Start the transmission
-    dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
+    //dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
+    dwt_starttx(DWT_START_TX_IMMEDIATE);
 
     // MP bug - TX antenna delay needs reprogramming as it is
     // not preserved
@@ -728,7 +746,7 @@ void read_data_SPI(uint16_t num_bytes, uint8_t* rec)
     for(cur_byte=0;cur_byte<num_bytes;cur_byte++){
         SPI2BUF = 0x00;
         while(!SPI2STATbits.SPIRBF);
-        rec[cur_byte] = SPI2BUF;
+        rec[cur_byte] = (uint8_t)(SPI2BUF&0xFF);
     }
 }
 
