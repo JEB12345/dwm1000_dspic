@@ -420,8 +420,28 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
 
                 //TODO: Hack.... But not sure of any other way to get this to time out correctly...
 //                dwt_setrxtimeout(NODE_DELAY_US*(NUM_ANCHORS-anchor_id)+ANC_RESP_DELAY+1000);
-                dwt_setrxtimeout(2000);
-                tag_state = tag_final;
+                dwt_setrxtimeout(0);
+                dwt_forcetrxoff();
+
+                uint32_t temp = dwt_readsystimestamphi32();
+                //uint32_t delay_time = temp + GLOBAL_PKT_DELAY_UPPER32;
+                uint32_t delay_time = temp + (convertmicrosectodevicetimeu32(TAG_SEND_FINAL_DELAY_US) >> 8);
+                //uint32_t delay_time = dwt_readsystimestamphi32() + GLOBAL_PKT_DELAY_UPPER32;
+                delay_time &= 0xFFFFFFFE;
+                dwt_setdelayedtrxtime(delay_time);
+
+                uint16_t tx_frame_length = sizeof(bcast_msg);
+                dwt_writetxfctrl(tx_frame_length, 0);
+
+                bcast_msg.seqNum++;
+                bcast_msg.messageType = MSG_TYPE_TAG_FINAL;
+                bcast_msg.tSF = delay_time;
+
+                dwt_writetxdata(tx_frame_length, (uint8_t*) &bcast_msg, 0);
+                int err = dwt_starttx(DWT_START_TX_IMMEDIATE);
+                dwt_settxantennadelay(TX_ANTENNA_DELAY);
+
+                tag_state = tag_stall;
             } else if(packet_type_byte == MSG_TYPE_ANC_FINAL){
                 struct ieee154_final_msg* final_msg_ptr;
                 final_msg_ptr = (struct ieee154_final_msg*) global_recv_pkt;
@@ -479,6 +499,7 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                 global_tRP = timestamp;
 
                 // Send response
+                dwt_forcetrxoff();
 
                 // Calculate the delay
                 uint32_t delay_time =
@@ -503,7 +524,7 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
 
                 // Start delayed TX
                 // Hopefully we will receive the FINAL message after this...
-                dwt_setrxaftertxdelay(2000);
+                dwt_setrxaftertxdelay(1);
                 err = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
                 dwt_settxantennadelay(global_tx_antenna_delay);
                 #ifdef DW_DEBUG
@@ -682,32 +703,11 @@ void instance_process(){
         case tag_final:
             wait_count = 0;
             //Make sure we're out of rx mode before attempting to transmit
-            dwt_forcetrxoff();
-
-            uint32_t temp = dwt_readsystimestamphi32();
-            //uint32_t delay_time = temp + GLOBAL_PKT_DELAY_UPPER32;
-            uint32_t delay_time = temp + (convertmicrosectodevicetimeu32(TAG_SEND_FINAL_DELAY_US) >> 8);
-            //uint32_t delay_time = dwt_readsystimestamphi32() + GLOBAL_PKT_DELAY_UPPER32;
-            delay_time &= 0xFFFFFFFE;
-            dwt_setdelayedtrxtime(delay_time);
-
-            uint16_t tx_frame_length = sizeof(bcast_msg);
-            dwt_writetxfctrl(tx_frame_length, 0);
-
-            bcast_msg.seqNum++;
-            bcast_msg.messageType = MSG_TYPE_TAG_FINAL;
-            bcast_msg.tSF = delay_time;
-
-            dwt_writetxdata(tx_frame_length, (uint8_t*) &bcast_msg, 0);
-            int err = dwt_starttx(DWT_START_TX_IMMEDIATE);
-            dwt_settxantennadelay(TX_ANTENNA_DELAY);
-
-            tag_state = tag_stall;
             break;
 
         case tag_stall:
             stall_count++;
-            if(stall_count > 100){
+            if(stall_count > 1000){
                 tag_state = tag_poll;
                 stall_count = 0;
             }
