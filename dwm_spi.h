@@ -16,6 +16,18 @@
 
 extern dwm_1000_status dwm_status;
 
+#define TAG_SEND_POLL_DELAY_US 250
+#define TAG_SEND_FINAL_DELAY_US 290
+#define TX_ANTENNA_DELAY 0
+
+typedef enum {
+    tag_init, tag_poll, tag_wait_response, tag_final, tag_stall
+}tag_states;
+
+typedef enum {
+    anchor_init, anchor_wait_receive, anchor_wait_final
+}anchor_states;
+
 /**
  * Code Copied directly or modified
  * from polypoint github code
