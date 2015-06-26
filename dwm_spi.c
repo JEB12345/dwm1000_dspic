@@ -170,7 +170,7 @@ uint8_t dwm_init()
 
     // Setup interrupts
     // Note: using auto rx re-enable so don't need to trigger on error frames
-    dwt_setinterrupt(//DWT_INT_TFRS |
+    dwt_setinterrupt(DWT_INT_TFRS |
                      DWT_INT_RFCG |
                      DWT_INT_SFDT |
                      DWT_INT_RFTO |
@@ -420,28 +420,43 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
 
                 //TODO: Hack.... But not sure of any other way to get this to time out correctly...
 //                dwt_setrxtimeout(NODE_DELAY_US*(NUM_ANCHORS-anchor_id)+ANC_RESP_DELAY+1000);
-                dwt_setrxtimeout(0);
                 dwt_forcetrxoff();
-
-                uint32_t temp = dwt_readsystimestamphi32();
-                //uint32_t delay_time = temp + GLOBAL_PKT_DELAY_UPPER32;
-                uint32_t delay_time = temp + (convertmicrosectodevicetimeu32(TAG_SEND_FINAL_DELAY_US) >> 8);
-                //uint32_t delay_time = dwt_readsystimestamphi32() + GLOBAL_PKT_DELAY_UPPER32;
+                uint32_t delay_time = dwt_readsystimestamphi32() + (convertmicrosectodevicetimeu32(TAG_SEND_FINAL_DELAY_US));
                 delay_time &= 0xFFFFFFFE;
                 dwt_setdelayedtrxtime(delay_time);
-
-                uint16_t tx_frame_length = sizeof(bcast_msg);
+                // Set the packet length
+                uint16_t tx_frame_length = offsetof(struct ieee154_bcast_msg, tRR) + 2;
+//                uint16_t tx_frame_length = sizeof(bcast_msg);
+                // Put at beginning of TX fifo
                 dwt_writetxfctrl(tx_frame_length, 0);
 
                 bcast_msg.seqNum++;
                 bcast_msg.messageType = MSG_TYPE_TAG_FINAL;
                 bcast_msg.tSF = delay_time;
-
                 dwt_writetxdata(tx_frame_length, (uint8_t*) &bcast_msg, 0);
-                int err = dwt_starttx(DWT_START_TX_IMMEDIATE);
-                dwt_settxantennadelay(TX_ANTENNA_DELAY);
-
+                err = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
+                dwt_settxantennadelay(global_tx_antenna_delay);
                 tag_state = tag_stall;
+
+//                uint32_t temp = dwt_readsystimestamphi32();
+//                //uint32_t delay_time = temp + GLOBAL_PKT_DELAY_UPPER32;
+//                uint32_t delay_time = temp + (convertmicrosectodevicetimeu32(TAG_SEND_FINAL_DELAY_US) >> 8);
+//                //uint32_t delay_time = dwt_readsystimestamphi32() + GLOBAL_PKT_DELAY_UPPER32;
+//                delay_time &= 0xFFFFFFFE;
+//                dwt_setdelayedtrxtime(delay_time);
+//
+//                uint16_t tx_frame_length = sizeof(bcast_msg);
+//                dwt_writetxfctrl(tx_frame_length, 0);
+//
+//                bcast_msg.seqNum++;
+//                bcast_msg.messageType = MSG_TYPE_TAG_FINAL;
+//                bcast_msg.tSF = delay_time;
+//
+//                dwt_writetxdata(tx_frame_length, (uint8_t*) &bcast_msg, 0);
+//                int err = dwt_starttx(DWT_START_TX_IMMEDIATE);
+//                dwt_settxantennadelay(TX_ANTENNA_DELAY);
+
+//                tag_state = tag_final;
             } else if(packet_type_byte == MSG_TYPE_ANC_FINAL){
                 struct ieee154_final_msg* final_msg_ptr;
                 final_msg_ptr = (struct ieee154_final_msg*) global_recv_pkt;
@@ -450,6 +465,7 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
             }
         } else if (rxd->event == DWT_SIG_RX_TIMEOUT) {
 //            uint32_t delay_time = dwt_readsystimestamphi32() + global_pkt_delay_upper32;
+//            uint32_t delay_time = dwt_readsystimestamphi32() + (convertmicrosectodevicetimeu32(TAG_SEND_FINAL_DELAY_US) >> 8);
 //            delay_time &= 0xFFFFFFFE;
 //            dwt_setdelayedtrxtime(delay_time);
 //            // Set the packet length
@@ -461,8 +477,9 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
 //            bcast_msg.messageType = MSG_TYPE_TAG_FINAL;
 //            bcast_msg.tSF = delay_time;
 //            dwt_writetxdata(tx_frame_length, (uint8_t*) &bcast_msg, 0);
-//            err = dwt_starttx(DWT_START_TX_DELAYED);
+//            err = dwt_starttx(DWT_START_TX_IMMEDIATE);
 //            dwt_settxantennadelay(global_tx_antenna_delay);
+//            tag_state = tag_stall;
 //            #ifdef DW_DEBUG
 //                if (err) {
 //                    printf("Error sending final message\r\n");
@@ -503,8 +520,8 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
 
                 // Calculate the delay
                 uint32_t delay_time =
-                    ((uint32_t) (global_tRP >> 8)) +
-                    global_pkt_delay_upper32*ANCHOR_EUI + (convertmicrosectodevicetimeu32(ANC_RESP_DELAY) >> 8);
+                    ((dwt_readrxtimestamphi32())) +
+                    (convertmicrosectodevicetimeu32(ANC_RESP_DELAY));
                 delay_time &= 0xFFFFFFFE;
                 global_tSR = delay_time;
                 dwt_setdelayedtrxtime(delay_time);
@@ -524,8 +541,9 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
 
                 // Start delayed TX
                 // Hopefully we will receive the FINAL message after this...
-                dwt_setrxaftertxdelay(1);
-                err = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
+
+                dwt_setrxtimeout(0);
+                err = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
                 dwt_settxantennadelay(global_tx_antenna_delay);
                 #ifdef DW_DEBUG
                     if (err) {
@@ -534,16 +552,16 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                 #endif
 
                 // Start timer which will sequentially tune through all the channels
-                dwt_readrxdata(&subseq_num, 1, 16);
-                if(subseq_num == 0){
-                    global_subseq_num = 0;
-//                    rtimer_set(&periodic_timer, RTIMER_NOW() + SUBSEQUENCE_PERIOD - RTIMER_SECOND*0.011805, 1,  //magic number from saleae to approximately line up config times
-//                                (rtimer_callback_t)periodic_task, NULL);
-                    global_seq_count++;
+//                dwt_readrxdata(&subseq_num, 1, 16);
+//                if(subseq_num == 0){
+//                    global_subseq_num = 0;
+////                    rtimer_set(&periodic_timer, RTIMER_NOW() + SUBSEQUENCE_PERIOD - RTIMER_SECOND*0.011805, 1,  //magic number from saleae to approximately line up config times
+////                                (rtimer_callback_t)periodic_task, NULL);
+//                    global_seq_count++;
                     //Reset all the distance measurements
                     memset(fin_msg.distanceHist, 0, sizeof(fin_msg.distanceHist));
 
-                }
+//                }
                 anchor_state = anchor_wait_final;
             } else if (packet_type_byte == MSG_TYPE_TAG_FINAL) {
                 // Got FINAL
@@ -656,12 +674,12 @@ void send_poll(){
 	//dwt_setrxtimeout(APP_US_TO_DEVICETIMEU32(NODE_DELAY_US*(NUM_ANCHORS+1)));
 
 	// Delay RX?
-	dwt_setrxaftertxdelay(1); // us
+//	dwt_setrxaftertxdelay(1); // us
 
 	uint32_t temp = dwt_readsystimestamphi32();
 	//uint32_t delay_time = temp + GLOBAL_PKT_DELAY_UPPER32;
 	//(APP_US_TO_DEVICETIMEU32(NODE_DELAY_US) & DELAY_MASK) >> 8
-	uint32_t delay_time = temp + (convertmicrosectodevicetimeu32(TAG_SEND_POLL_DELAY_US) >> 8);
+	uint32_t delay_time = temp + (convertmicrosectodevicetimeu32(TAG_SEND_POLL_DELAY_US));
 	//uint32_t delay_time = dwt_readsystimestamphi32() + GLOBAL_PKT_DELAY_UPPER32;
 	delay_time &= 0xFFFFFFFE; //Make sure last bit is zero
 	dwt_setdelayedtrxtime(delay_time);
@@ -671,7 +689,7 @@ void send_poll(){
 	dwt_writetxdata(tx_frame_length, (uint8_t*) &bcast_msg, 0);
 
 	// Start the transmission
-	dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
+	dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
 
 	// MP bug - TX antenna delay needs reprogramming as it is
 	// not preserved
@@ -687,6 +705,7 @@ void instance_process(){
             break;
 
         case tag_poll:
+            stall_count = 0;
             dwt_forcetrxoff();  // Force the tx or rx state off
             send_poll();
             tag_state = tag_wait_response;
@@ -702,7 +721,6 @@ void instance_process(){
 
         case tag_final:
             wait_count = 0;
-            //Make sure we're out of rx mode before attempting to transmit
             break;
 
         case tag_stall:
@@ -857,7 +875,7 @@ void dw1000_populate_eui (uint8_t *eui_buf, uint8_t id) {
 /**
  * This interrupt function is tied to the IRQ pin from the DWM1000 module
  */
-void __attribute__((__interrupt__, __auto_psv__)) _INT2Interrupt(void)
+void __attribute__((__interrupt__, __no_auto_psv__)) _INT2Interrupt(void)
 {
     // This is the interrupt handler used by the DWM1000 API library.
     dwm_status.irq_enable = 1;
