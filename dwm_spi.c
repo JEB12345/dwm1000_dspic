@@ -127,7 +127,7 @@ tag_states tag_state = tag_init;
         uint8_t fcs[2] ;                                  //  we allow space for the CRC as it is logically part of the message. However ScenSor TX calculates and adds these bytes.
     } __attribute__ ((__packed__));
 
-    struct ieee154_bcast_msg  {
+        struct ieee154_bcast_msg  {
         uint8_t frameCtrl[2];                             //  frame control bytes 00-01
         uint8_t seqNum;                                   //  sequence_number 02
         uint8_t panID[2];                                 //  PAN ID 03-04
@@ -137,7 +137,10 @@ tag_states tag_state = tag_init;
         uint8_t subSeqNum;
         uint32_t tSP;
         uint32_t tSF;
-        uint64_t tRR[NUM_ANCHORS]; // time differences
+        //uint32_t tRR_L;
+        //uint32_t tRR_H;
+        uint64_t tRR;
+        //uint64_t tRR[NUM_ANCHORS]; // time differences
         uint8_t fcs[2] ;                                  //  we allow space for the CRC as it is logically part of the message. However ScenSor TX calculates and adds these bytes.
     } __attribute__ ((__packed__));
 
@@ -416,8 +419,9 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                 if(anchor_id >= NUM_ANCHORS) anchor_id = NUM_ANCHORS;
 
                 // Need to actually fill out the packet
-                bcast_msg.tRR[anchor_id-1] = global_tag_anchor_resp_rx_time;
-
+                bcast_msg.tRR = 5;//global_tag_anchor_resp_rx_time;
+                //bcast_msg.tRR_H = (uint32_t)((global_tag_anchor_resp_rx_time>>32)&0xFFFFFFFF);
+                //bcast_msg.tRR_L = (uint32_t)((global_tag_anchor_resp_rx_time)&0xFFFFFFFF);
                 //TODO: Hack.... But not sure of any other way to get this to time out correctly...
 //                dwt_setrxtimeout(NODE_DELAY_US*(NUM_ANCHORS-anchor_id)+ANC_RESP_DELAY+1000);
                 dwt_forcetrxoff();
@@ -425,8 +429,8 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                 delay_time &= 0xFFFFFFFE;
                 dwt_setdelayedtrxtime(delay_time);
                 // Set the packet length
-                uint16_t tx_frame_length = offsetof(struct ieee154_bcast_msg, tRR) + 2;
-//                uint16_t tx_frame_length = sizeof(bcast_msg);
+                uint16_t tx_frame_length = offsetof(struct ieee154_bcast_msg, tRR) + 2;//TODO: this is wrong
+                //uint16_t tx_frame_length = sizeof(bcast_msg);
                 // Put at beginning of TX fifo
                 dwt_writetxfctrl(tx_frame_length, 0);
 
@@ -507,7 +511,7 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                         (((uint64_t) txTimeStamp[3]) << 24) +
                         (((uint64_t) txTimeStamp[4]) << 32);
 
-            // Get the packet
+            // tGet the packet
             dwt_readrxdata(&packet_type_byte, 1, 15);
 
 
@@ -566,7 +570,7 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
             } else if (packet_type_byte == MSG_TYPE_TAG_FINAL) {
                 // Got FINAL
 
-                // Read the whole packet
+                // Read the whole packett
                 dwt_readrxdata((uint8_t*)&bcast_msg, sizeof(bcast_msg), 0);
 
                 global_tRF = timestamp;
@@ -574,7 +578,7 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                 //TODO: might need to normalize all times to tSP and tRP
                 double tRF = (double)global_tRF;
                 double tSR = (double)(((uint64_t)global_tSR) << 8);
-                double tRR = (double)bcast_msg.tRR[ANCHOR_EUI-1];
+                double tRR = (double)bcast_msg.tRR;//((((uint64_t)bcast_msg.tRR_H)<<32)|(((uint64_t)bcast_msg.tRR_L)));//NCHOR_EUI-1];
                 double tSP = (double)(((uint64_t)bcast_msg.tSP) << 8);
                 double tSF = (double)(((uint64_t)bcast_msg.tSF) << 8);
                 double tRP = (double)global_tRP;
@@ -655,10 +659,11 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
 
 void send_poll(){
     //Reset all the tRRs at the beginning of each poll event
-	memset(bcast_msg.tRR, 0, sizeof(bcast_msg.tRR));
-
+	//memset(bcast_msg.tRR, 0, sizeof(bcast_msg.tRR));//TODO: hacked
+    bcast_msg.tRR = 0;//_H = bcast_msg.tRR_L = 0;
+    
 	// Through tSP (tSF is field after) then +2 for FCS
-	uint16_t tx_frame_length = offsetof(struct ieee154_bcast_msg, tSF) + 2;
+	uint16_t tx_frame_length = offsetof(struct ieee154_bcast_msg, tRR) + 2; //TODO: this is wrong
 	memset(bcast_msg.destAddr, 0xFF, 2);
 
 	bcast_msg.seqNum++;
