@@ -51,13 +51,14 @@ tag_states tag_state = tag_init;
         0x93
     };
 
+    // This assumes you are using 64MHz PRF!!!
     const uint8_t txPower[8] = {
         0x0,
         0x67,
         0x67,
         0x8b,
         0x9a,
-        0x85,
+        0x48,//0x85,
         0x0,
         0xd1
     };
@@ -93,9 +94,11 @@ tag_states tag_state = tag_init;
     uint32_t global_pkt_delay_upper32 = 0;
 
     uint64_t global_tag_poll_tx_time = 0;
-    uint64_t global_tag_anchor_resp_rx_time = 0;
+//    uint64_t global_tag_anchor_resp_rx_time = 0;
+    uint32_t global_tag_anchor_resp_rx_time = 0;
 
-    uint64_t global_tRP = 0;
+//    uint64_t global_tRP = 0;
+    uint32_t global_tRP = 0;
     uint32_t global_tSR = 0;
     uint64_t global_tRF = 0;
     uint8_t global_recv_pkt[512];
@@ -127,7 +130,7 @@ tag_states tag_state = tag_init;
         uint8_t fcs[2] ;                                  //  we allow space for the CRC as it is logically part of the message. However ScenSor TX calculates and adds these bytes.
     } __attribute__ ((__packed__));
 
-        struct ieee154_bcast_msg  {
+    struct ieee154_bcast_msg  {
         uint8_t frameCtrl[2];                             //  frame control bytes 00-01
         uint8_t seqNum;                                   //  sequence_number 02
         uint8_t panID[2];                                 //  PAN ID 03-04
@@ -139,7 +142,7 @@ tag_states tag_state = tag_init;
         uint32_t tSF;
         //uint32_t tRR_L;
         //uint32_t tRR_H;
-        uint64_t tRR;
+        uint32_t tRR;
         //uint64_t tRR[NUM_ANCHORS]; // time differences
         uint8_t fcs[2] ;                                  //  we allow space for the CRC as it is logically part of the message. However ScenSor TX calculates and adds these bytes.
     } __attribute__ ((__packed__));
@@ -393,12 +396,13 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
 
             // Get the timestamp first
             uint8_t txTimeStamp[5] = {0, 0, 0, 0, 0};
-            dwt_readrxtimestamp(txTimeStamp);
-            global_tag_anchor_resp_rx_time = (uint64_t) txTimeStamp[0] +
-                                             (((uint64_t) txTimeStamp[1]) << 8) +
-                                             (((uint64_t) txTimeStamp[2]) << 16) +
-                                             (((uint64_t) txTimeStamp[3]) << 24) +
-                                             (((uint64_t) txTimeStamp[4]) << 32);
+            global_tag_anchor_resp_rx_time = dwt_readrxtimestamphi32();
+//            dwt_readrxtimestamp(txTimeStamp);
+//            global_tag_anchor_resp_rx_time = (uint64_t) txTimeStamp[0] +
+//                                             (((uint64_t) txTimeStamp[1]) << 8) +
+//                                             (((uint64_t) txTimeStamp[2]) << 16) +
+//                                             (((uint64_t) txTimeStamp[3]) << 24) +
+//                                             (((uint64_t) txTimeStamp[4]) << 32);
 
             // Get the packet
             dwt_readrxdata(global_recv_pkt, rxd->datalength, 0);
@@ -429,8 +433,8 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                 delay_time &= 0xFFFFFFFE;
                 dwt_setdelayedtrxtime(delay_time);
                 // Set the packet length
-                uint16_t tx_frame_length = offsetof(struct ieee154_bcast_msg, tRR) + 2;//TODO: this is wrong
-                //uint16_t tx_frame_length = sizeof(bcast_msg);
+//                uint16_t tx_frame_length = offsetof(struct ieee154_bcast_msg, tRR) + 2;//TODO: this is wrong
+                uint16_t tx_frame_length = sizeof(bcast_msg);
                 // Put at beginning of TX fifo
                 dwt_writetxfctrl(tx_frame_length, 0);
 
@@ -537,7 +541,7 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                 // ANCHOR_ID:          1
                 // CRC:                2
                 // total              25
-                uint16_t tx_frame_length = 25;
+                uint16_t tx_frame_length = sizeof(msg); // Should be 25
                 // Put at beginning of TX fifo
                 dwt_writetxfctrl(tx_frame_length, 0);
 
@@ -664,6 +668,7 @@ void send_poll(){
     
 	// Through tSP (tSF is field after) then +2 for FCS
 	uint16_t tx_frame_length = offsetof(struct ieee154_bcast_msg, tRR) + 2; //TODO: this is wrong
+//    uint16_t tx_frame_length = sizeof(bcast_msg);
 	memset(bcast_msg.destAddr, 0xFF, 2);
 
 	bcast_msg.seqNum++;

@@ -2293,16 +2293,7 @@ void dwt_isr(void) // assume interrupt can supply context
 			else //no overrun condition - proceed to process the frame
 			{
                 
-//                        while(1){
-//            #define RGB_RED     LATGbits.LATG8
-//#define RGB_BLUE    LATGbits.LATG6
-//#define RGB_GREEN   LATAbits.LATA0
-//            RGB_RED = 1;
-//            RGB_GREEN = 0;
-//            RGB_BLUE = 1;
-//        }
-			
-			len = dwt_read16bitoffsetreg(RX_FINFO_ID, 0) & 0x3FF;
+		len = dwt_read16bitoffsetreg(RX_FINFO_ID, 0) & 0x3FF;
 	        dwt_readfromdevice(RX_BUFFER_ID,0,2,dw1000local.cdata.fctrl) ;
 	        if (dw1000local.longFrames==0)
 	        {
