@@ -423,7 +423,7 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                 if(anchor_id >= NUM_ANCHORS) anchor_id = NUM_ANCHORS;
 
                 // Need to actually fill out the packet
-                bcast_msg.tRR = 5;//global_tag_anchor_resp_rx_time;
+                bcast_msg.tRR = global_tag_anchor_resp_rx_time;
                 //bcast_msg.tRR_H = (uint32_t)((global_tag_anchor_resp_rx_time>>32)&0xFFFFFFFF);
                 //bcast_msg.tRR_L = (uint32_t)((global_tag_anchor_resp_rx_time)&0xFFFFFFFF);
                 //TODO: Hack.... But not sure of any other way to get this to time out correctly...
@@ -582,7 +582,7 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                 //TODO: might need to normalize all times to tSP and tRP
                 double tRF = (double)global_tRF;
                 double tSR = (double)(((uint64_t)global_tSR) << 8);
-                double tRR = (double)bcast_msg.tRR;//((((uint64_t)bcast_msg.tRR_H)<<32)|(((uint64_t)bcast_msg.tRR_L)));//NCHOR_EUI-1];
+                double tRR = (double)(((uint64_t)bcast_msg.tRR) << 8);//((((uint64_t)bcast_msg.tRR_H)<<32)|(((uint64_t)bcast_msg.tRR_L)));//NCHOR_EUI-1];
                 double tSP = (double)(((uint64_t)bcast_msg.tSP) << 8);
                 double tSF = (double)(((uint64_t)bcast_msg.tSF) << 8);
                 double tRP = (double)global_tRP;
@@ -602,13 +602,13 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                     double dist = (tTOF*DWT_TIME_UNITS)/2;
 
                     ////tTOF^2 + (-tRF + tSR - tRR + tSP)*tTOF + (tRR*tRF - tSP*tRF - tSR*tRR + tSP*tSR - (tSF-tRR)*(tSR-tRP)) = 0
-                    //double a = 1.0;
-                    //double b = -tRF + tSR - tRR + tSP;
-                    //double c = tRR*tRF - tSP*tRF - tSR*tRR + tSP*tSR - (tSF-tRR)*(tSR-tRP);
-
-                    ////Perform quadratic equation
-                    //double tTOF = (-b-sqrt(pow(b,2)-4*a*c))/(2*a);
-                    //double dist = (tTOF * (double) DWT_TIME_UNITS) * 0.5;
+//                    double a = 1.0;
+//                    double b = -tRF + tSR - tRR + tSP;
+//                    double c = tRR*tRF - tSP*tRF - tSR*tRR + tSP*tSR - (tSF-tRR)*(tSR-tRP);
+//
+//                    ////Perform quadratic equation
+//                    double tTOF = (-b-sqrt(pow(b,2)-4*a*c))/(2*a);
+//                    double dist = (tTOF * (double) DWT_TIME_UNITS) * 0.5;
                     dist *= SPEED_OF_LIGHT;
                     //double range_bias = 0.0;//dwt_getrangebias(global_chan, (float) dist, DWT_PRF_64M);
 #ifndef DW_CAL_TRX_DELAY
