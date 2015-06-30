@@ -95,10 +95,10 @@ tag_states tag_state = tag_init;
 
     uint64_t global_tag_poll_tx_time = 0;
 //    uint64_t global_tag_anchor_resp_rx_time = 0;
-    uint32_t global_tag_anchor_resp_rx_time = 0;
+    uint64_t global_tag_anchor_resp_rx_time = 0;
 
 //    uint64_t global_tRP = 0;
-    uint32_t global_tRP = 0;
+    uint64_t global_tRP = 0;
     uint32_t global_tSR = 0;
     uint64_t global_tRF = 0;
     uint8_t global_recv_pkt[512];
@@ -396,13 +396,13 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
 
             // Get the timestamp first
             uint8_t txTimeStamp[5] = {0, 0, 0, 0, 0};
-            global_tag_anchor_resp_rx_time = dwt_readrxtimestamphi32();
-//            dwt_readrxtimestamp(txTimeStamp);
-//            global_tag_anchor_resp_rx_time = (uint64_t) txTimeStamp[0] +
-//                                             (((uint64_t) txTimeStamp[1]) << 8) +
-//                                             (((uint64_t) txTimeStamp[2]) << 16) +
-//                                             (((uint64_t) txTimeStamp[3]) << 24) +
-//                                             (((uint64_t) txTimeStamp[4]) << 32);
+//            global_tag_anchor_resp_rx_time = dwt_readrxtimestamphi32();
+            dwt_readrxtimestamp(txTimeStamp);
+            global_tag_anchor_resp_rx_time = (uint64_t) txTimeStamp[0] +
+                                             (((uint64_t) txTimeStamp[1]) << 8) +
+                                             (((uint64_t) txTimeStamp[2]) << 16) +
+                                             (((uint64_t) txTimeStamp[3]) << 24) +
+                                             (((uint64_t) txTimeStamp[4]) << 32);
 
             // Get the packet
             dwt_readrxdata(global_recv_pkt, rxd->datalength, 0);
@@ -580,12 +580,12 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                 global_tRF = timestamp;
 
                 //TODO: might need to normalize all times to tSP and tRP
-                double tRF = (double)global_tRF;
-                double tSR = (double)(((uint64_t)global_tSR) << 8);
-                double tRR = (double)(((uint64_t)bcast_msg.tRR) << 8);//((((uint64_t)bcast_msg.tRR_H)<<32)|(((uint64_t)bcast_msg.tRR_L)));//NCHOR_EUI-1];
-                double tSP = (double)(((uint64_t)bcast_msg.tSP) << 8);
-                double tSF = (double)(((uint64_t)bcast_msg.tSF) << 8);
-                double tRP = (double)global_tRP;
+                long double tRF = (long double)global_tRF;
+                long double tSR = (long double)(((uint64_t)global_tSR) << 8);
+                long double tRR = (long double)(((uint64_t)bcast_msg.tRR) << 8);//((((uint64_t)bcast_msg.tRR_H)<<32)|(((uint64_t)bcast_msg.tRR_L)));//NCHOR_EUI-1];
+                long double tSP = (long double)(((uint64_t)bcast_msg.tSP) << 8);
+                long double tSF = (long double)(((uint64_t)bcast_msg.tSF) << 8);
+                long double tRP = (long double)global_tRP;
 
                 #ifdef DW_DEBUG
                     printf("tRF = %llu\r\n", (uint64_t)tRF);
@@ -597,9 +597,9 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                 #endif
 
                 if(tRF != 0.0 && tSR != 0.0 && tRR != 0.0 && tSP != 0.0 && tSF != 0.0 && tRP != 0.0){
-                    double aot = (tRF-tRP)/(tSF-tSP);
-                    double tTOF = (tRF-tSR)-(tSF-tRR)*aot;
-                    double dist = (tTOF*DWT_TIME_UNITS)/2;
+                    long double aot = (tRF-tRP)/(tSF-tSP);
+                    long double tTOF = (tRF-tSR)-(tSF-tRR)*aot;
+                    long double dist = (tTOF*DWT_TIME_UNITS)/2;
 
                     ////tTOF^2 + (-tRF + tSR - tRR + tSP)*tTOF + (tRR*tRF - tSP*tRF - tSR*tRR + tSP*tSR - (tSF-tRR)*(tSR-tRP)) = 0
 //                    double a = 1.0;
