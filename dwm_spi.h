@@ -16,8 +16,11 @@
 
 extern dwm_1000_status dwm_status;
 
-#define TAG_SEND_POLL_DELAY_US 250
-#define TAG_SEND_FINAL_DELAY_US 290
+#define DWM_RESET_ON DWM_RESET_TRIS = 0; DWM_RESET_OUT = 0
+#define DWM_RESET_OFF DWM_RESET_TRIS = 1
+
+#define TAG_SEND_POLL_DELAY_US 10
+#define TAG_SEND_FINAL_DELAY_US 10
 #define TX_ANTENNA_DELAY 0
 
 typedef enum {
@@ -63,7 +66,7 @@ typedef enum {
 #define DW1000_PANID 0xD100
 #define SPEED_OF_LIGHT 299702548.0
 #define NODE_DELAY_US 6500
-#define ANC_RESP_DELAY 300
+#define ANC_RESP_DELAY 10
 #define DELAY_MASK 0x00FFFFFFFE00
 #define NUM_ANTENNAS 1
 #define NUM_CHANNELS 1

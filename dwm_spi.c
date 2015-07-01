@@ -7,6 +7,7 @@
 
 #include "dwm_spi.h"
 #include "decadriver/deca_device_api.h"
+#include "decadriver/deca_regs.h"
 #include <stdlib.h>
 #include <spi.h>
 #include <string.h>
@@ -58,7 +59,7 @@ tag_states tag_state = tag_init;
         0x67,
         0x8b,
         0x9a,
-        0x48,//0x85,
+        0x85,
         0x0,
         0xd1
     };
@@ -93,14 +94,15 @@ tag_states tag_state = tag_init;
 
     uint32_t global_pkt_delay_upper32 = 0;
 
-    uint64_t global_tag_poll_tx_time = 0;
+    uint32_t global_tag_poll_tx_time = 0;
 //    uint64_t global_tag_anchor_resp_rx_time = 0;
-    uint64_t global_tag_anchor_resp_rx_time = 0;
+    uint32_t global_tag_anchor_resp_rx_time = 0;
 
 //    uint64_t global_tRP = 0;
-    uint64_t global_tRP = 0;
+    uint32_t global_tRR = 0;
+    uint32_t global_tRP = 0;
     uint32_t global_tSR = 0;
-    uint64_t global_tRF = 0;
+    uint32_t global_tRF = 0;
     uint8_t global_recv_pkt[512];
 
     uint32_t global_subseq_num = 0x0;
@@ -140,8 +142,6 @@ tag_states tag_state = tag_init;
         uint8_t subSeqNum;
         uint32_t tSP;
         uint32_t tSF;
-        //uint32_t tRR_L;
-        //uint32_t tRR_H;
         uint32_t tRR;
         //uint64_t tRR[NUM_ANCHORS]; // time differences
         uint8_t fcs[2] ;                                  //  we allow space for the CRC as it is logically part of the message. However ScenSor TX calculates and adds these bytes.
@@ -157,11 +157,24 @@ tag_states tag_state = tag_init;
 #define FIXED_REPLY_DELAY       			150
 #define FIXED_LONG_BLINK_RESPONSE_DELAY       (5*FIXED_REPLY_DELAY) //NOTE: this should be a multiple of FIXED_LONG_REPLY_DELAY see DELAY_MULTIPLE below
 
+void dwm_reset()
+{
+    DWM_RESET_ON;
+    Delay_us(20);
+    DWM_RESET_OFF;
+}
+
 uint8_t dwm_init()
 {
     uint8_t result = 1;
     uint32_t devID ;
-    
+
+    dwm_reset();
+
+    while(DWM_RESET_IN != 1);
+
+    Delay_us(10); // The PLL clock is not settled after the chip goes into INIT state, a minimum of 5us is needed.
+
     devID = dwt_readdevid();
 
     if (DWT_DEVICE_ID != devID) {
@@ -171,7 +184,7 @@ uint8_t dwm_init()
     result = dwt_initialise(DWT_LOADUCODE    |
                          DWT_LOADLDO      |
                          DWT_LOADTXCONFIG |
-                         DWT_LOADXTALTRIM);
+                         DWT_LOADLDOTUNE);
     if (0 > result) return(-1);
 
     // Setup interrupts
@@ -196,34 +209,35 @@ uint8_t dwm_init()
      * https://github.com/lab11/polypoint
      */
     // Set the parameters of ranging and channel and whatnot
-//    global_ranging_config.chan           = 2;
-//    global_ranging_config.prf            = DWT_PRF_64M;
-//    global_ranging_config.txPreambLength = DWT_PLEN_4096;//DWT_PLEN_4096
-//    // global_ranging_config.txPreambLength = DWT_PLEN_256;
-//    global_ranging_config.rxPAC          = DWT_PAC64;
-//    global_ranging_config.txCode         = 9;  // preamble code
-//    global_ranging_config.rxCode         = 9;  // preamble code
-//    global_ranging_config.nsSFD          = 1;
-//    global_ranging_config.dataRate       = DWT_BR_110K;
-//    global_ranging_config.phrMode        = DWT_PHRMODE_EXT; //Enable extended PHR mode (up to 1024-byte packets)
-//    global_ranging_config.smartPowerEn   = 0;
-//    global_ranging_config.sfdTO          = 4096+64+1;//(1025 + 64 - 32);
-//    dwt_configure(&global_ranging_config, 0);
-//
+        global_ranging_config.chan           = 2;
+	global_ranging_config.prf            = DWT_PRF_64M;
+	global_ranging_config.txPreambLength = DWT_PLEN_64;//DWT_PLEN_4096
+	// global_ranging_config.txPreambLength = DWT_PLEN_256;
+	global_ranging_config.rxPAC          = DWT_PAC8;
+	global_ranging_config.txCode         = 9;  // preamble code
+	global_ranging_config.rxCode         = 9;  // preamble code
+	global_ranging_config.nsSFD          = 0;
+	global_ranging_config.dataRate       = DWT_BR_6M8;
+	global_ranging_config.phrMode        = DWT_PHRMODE_EXT; //Enable extended PHR mode (up to 1024-byte packets)
+	global_ranging_config.smartPowerEn   = 1;
+	global_ranging_config.sfdTO          = 64+8+1;//(1025 + 64 - 32);
+	dwt_configure(&global_ranging_config, 0);//(DWT_LOADANTDLY | DWT_LOADXTALTRIM));
+	dwt_setsmarttxpower(global_ranging_config.smartPowerEn);
     
-        global_ranging_config.chan           = 5;
-        global_ranging_config.prf            = DWT_PRF_16M;
-        global_ranging_config.txPreambLength = DWT_PLEN_128;//DWT_PLEN_4096
-        // global_ranging_config.txPreambLength = DWT_PLEN_256;
-        global_ranging_config.rxPAC          = DWT_PAC8; //?
-        global_ranging_config.txCode         = 4;  // preamble code
-        global_ranging_config.rxCode         = 4;  // preamble code
-        global_ranging_config.nsSFD          = 0; //?
-        global_ranging_config.dataRate       = DWT_BR_6M8;
-        global_ranging_config.phrMode        = DWT_PHRMODE_STD;//? //Enable extended PHR mode (up to 1024-byte packets)
-        global_ranging_config.smartPowerEn   = 0;
-        global_ranging_config.sfdTO          = 4096+64+1;//(1025 + 64 - 32);
-        dwt_configure(&global_ranging_config, 0);
+//        global_ranging_config.chan           = 5;
+//        global_ranging_config.prf            = DWT_PRF_16M;
+//        global_ranging_config.txPreambLength = DWT_PLEN_128;//DWT_PLEN_4096
+//        // global_ranging_config.txPreambLength = DWT_PLEN_256;
+//        global_ranging_config.rxPAC          = DWT_PAC8; //?
+//        global_ranging_config.txCode         = 4;  // preamble code
+//        global_ranging_config.rxCode         = 4;  // preamble code
+//        global_ranging_config.nsSFD          = 0; //?
+//        global_ranging_config.dataRate       = DWT_BR_6M8;
+//        global_ranging_config.phrMode        = DWT_PHRMODE_STD;//? //Enable extended PHR mode (up to 1024-byte packets)
+//        global_ranging_config.smartPowerEn   = 0;
+//        global_ranging_config.sfdTO          = 4096+64+1;//(1025 + 64 - 32);
+//        dwt_configure(&global_ranging_config, 0);
+
     dwt_configeventcounters(1);
     // Configure TX power
     {
@@ -232,12 +246,12 @@ uint8_t dwm_init()
         dwt_configuretxrf(&global_tx_config);
     }
 
-    if(DW1000_ROLE_TYPE == TAG){
-        dwt_xtaltrim(xtaltrim[0]);
-    }
-    else{
-        dwt_xtaltrim(xtaltrim[ANCHOR_EUI]);
-    }
+//    if(DW1000_ROLE_TYPE == TAG){
+//        dwt_xtaltrim(xtaltrim[0]);
+//    }
+//    else{
+//        dwt_xtaltrim(xtaltrim[ANCHOR_EUI]);
+//    }
 
     // Configure the antenna delay settings
     {
@@ -302,9 +316,10 @@ uint8_t dwm_init()
         // We do want to enable auto RX
         dwt_setautorxreenable(1);
         // Let's do double buffering
-        dwt_setdblrxbuffmode(0);
+        dwt_setdblrxbuffmode(1);
         // Disable RX timeout by setting to 0
         dwt_setrxtimeout(0);
+         dwt_enableautoack(5);
 
         // Try pre-populating this
         msg.seqNum++;
@@ -396,13 +411,13 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
 
             // Get the timestamp first
             uint8_t txTimeStamp[5] = {0, 0, 0, 0, 0};
-//            global_tag_anchor_resp_rx_time = dwt_readrxtimestamphi32();
-            dwt_readrxtimestamp(txTimeStamp);
-            global_tag_anchor_resp_rx_time = (uint64_t) txTimeStamp[0] +
-                                             (((uint64_t) txTimeStamp[1]) << 8) +
-                                             (((uint64_t) txTimeStamp[2]) << 16) +
-                                             (((uint64_t) txTimeStamp[3]) << 24) +
-                                             (((uint64_t) txTimeStamp[4]) << 32);
+            global_tag_anchor_resp_rx_time = dwt_readrxtimestamphi32();
+//            dwt_readrxtimestamp(txTimeStamp);
+//            global_tag_anchor_resp_rx_time = (uint64_t) txTimeStamp[0] +
+//                                             (((uint64_t) txTimeStamp[1]) << 8) +
+//                                             (((uint64_t) txTimeStamp[2]) << 16) +
+//                                             (((uint64_t) txTimeStamp[3]) << 24) +
+//                                             (((uint64_t) txTimeStamp[4]) << 32);
 
             // Get the packet
             dwt_readrxdata(global_recv_pkt, rxd->datalength, 0);
@@ -507,13 +522,13 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
 
 
             // Get the timestamp first
-            uint8_t txTimeStamp[5] = {0, 0, 0, 0, 0};
-            dwt_readrxtimestamp(txTimeStamp);
-            timestamp = (uint64_t) txTimeStamp[0] +
-                        (((uint64_t) txTimeStamp[1]) << 8) +
-                        (((uint64_t) txTimeStamp[2]) << 16) +
-                        (((uint64_t) txTimeStamp[3]) << 24) +
-                        (((uint64_t) txTimeStamp[4]) << 32);
+//            uint8_t txTimeStamp[5] = {0, 0, 0, 0, 0};
+//            dwt_readrxtimestamp(txTimeStamp);
+//            timestamp = (uint64_t) txTimeStamp[0] +
+//                        (((uint64_t) txTimeStamp[1]) << 8) +
+//                        (((uint64_t) txTimeStamp[2]) << 16) +
+//                        (((uint64_t) txTimeStamp[3]) << 24) +
+//                        (((uint64_t) txTimeStamp[4]) << 32);
 
             // tGet the packet
             dwt_readrxdata(&packet_type_byte, 1, 15);
@@ -521,7 +536,8 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
 
             if (packet_type_byte == MSG_TYPE_TAG_POLL) {
                 // Got POLL
-                global_tRP = timestamp;
+//                global_tRP = timestamp;
+                global_tRP = dwt_readrxtimestamphi32();
 
                 // Send response
                 dwt_forcetrxoff();
@@ -577,15 +593,16 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                 // Read the whole packett
                 dwt_readrxdata((uint8_t*)&bcast_msg, sizeof(bcast_msg), 0);
 
-                global_tRF = timestamp;
+//                global_tRF = timestamp;
+                 global_tRF = dwt_readrxtimestamphi32();
 
                 //TODO: might need to normalize all times to tSP and tRP
-                long double tRF = (long double)global_tRF;
+                long double tRF = (long double)(((uint64_t)global_tRF)<< 8);
                 long double tSR = (long double)(((uint64_t)global_tSR) << 8);
                 long double tRR = (long double)(((uint64_t)bcast_msg.tRR) << 8);//((((uint64_t)bcast_msg.tRR_H)<<32)|(((uint64_t)bcast_msg.tRR_L)));//NCHOR_EUI-1];
                 long double tSP = (long double)(((uint64_t)bcast_msg.tSP) << 8);
                 long double tSF = (long double)(((uint64_t)bcast_msg.tSF) << 8);
-                long double tRP = (long double)global_tRP;
+                long double tRP = (long double)(((uint64_t)global_tRP) << 8);
 
                 #ifdef DW_DEBUG
                     printf("tRF = %llu\r\n", (uint64_t)tRF);
