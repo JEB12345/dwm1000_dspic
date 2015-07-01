@@ -422,7 +422,7 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
             // Get the packet
             dwt_readrxdata(global_recv_pkt, rxd->datalength, 0);
             msg_ptr = (struct ieee154_msg*) global_recv_pkt;
-            packet_type_byte = global_recv_pkt[21];
+            packet_type_byte = global_recv_pkt[offsetof(struct ieee154_msg, messageType)];
 
             // Packet type byte is at a know location
             if (packet_type_byte == MSG_TYPE_ANC_RESP) {
@@ -516,6 +516,7 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
         // a FINAL from a tag.
 
         if (rxd->event == DWT_SIG_RX_OKAY) {
+            struct ieee154_bcast_msg* msg_ptr;
             uint8_t packet_type_byte;
             uint64_t timestamp;
             uint8_t subseq_num;
@@ -531,7 +532,10 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
 //                        (((uint64_t) txTimeStamp[4]) << 32);
 
             // tGet the packet
-            dwt_readrxdata(&packet_type_byte, 1, 15);
+//            dwt_readrxdata(&packet_type_byte, 1, 15);
+            dwt_readrxdata(global_recv_pkt, rxd->datalength, 0);
+            msg_ptr = (struct ieee154_bcast_msg*) global_recv_pkt;
+            packet_type_byte = global_recv_pkt[offsetof(struct ieee154_bcast_msg, messageType)];
 
 
             if (packet_type_byte == MSG_TYPE_TAG_POLL) {
@@ -675,6 +679,8 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                 dwt_rxenable(0);
             }
         }
+        anchor_state = anchor_wait_receive;
+        dwt_rxenable(0);
     }
 }
 
@@ -684,8 +690,8 @@ void send_poll(){
     bcast_msg.tRR = 0;//_H = bcast_msg.tRR_L = 0;
     
 	// Through tSP (tSF is field after) then +2 for FCS
-	uint16_t tx_frame_length = offsetof(struct ieee154_bcast_msg, tRR) + 2; //TODO: this is wrong
-//    uint16_t tx_frame_length = sizeof(bcast_msg);
+//	uint16_t tx_frame_length = offsetof(struct ieee154_bcast_msg, tRR) + 2; //TODO: this is wrong
+    uint16_t tx_frame_length = sizeof(bcast_msg);
 	memset(bcast_msg.destAddr, 0xFF, 2);
 
 	bcast_msg.seqNum++;
