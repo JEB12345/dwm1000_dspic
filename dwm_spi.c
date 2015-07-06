@@ -19,6 +19,7 @@ uint16_t stall_count = 0;
 anchor_states anchor_state = anchor_init;
 tag_states tag_state = tag_init;
 
+
 /**
      * Code Copied directly or modified
      * from polypoint github code
@@ -551,7 +552,8 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                 // Got POLL
 //                global_tRP = timestamp;
                 global_tRP = dwt_readrxtimestamphi32();
-                global_tSP = global_recv_pkt[offsetof(struct ieee154_bcast_msg, tSP)];
+                //global_tSP = global_recv_pkt[offsetof(struct ieee154_bcast_msg, tSP)];
+                memcpy(&global_tSP,&global_recv_pkt[offsetof(struct ieee154_bcast_msg, tSP)],sizeof(uint32_t));
 
                 // Send response
                 dwt_forcetrxoff();
@@ -645,6 +647,7 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                     #endif
                     //dist -= dwt_getrangebias(2, (float) dist, DWT_PRF_64M);
                     fin_msg.distanceHist[global_subseq_num] = (float)dist;
+                    dwm_status.distance = dist;
                 }
 
                 //{
@@ -750,7 +753,7 @@ void instance_process(){
 
         case tag_wait_response:
             wait_count++;
-            if(wait_count > 1000){
+            if(wait_count > 200){
                 tag_state = tag_poll;
                 wait_count = 0;
             }
@@ -762,7 +765,7 @@ void instance_process(){
 
         case tag_stall:
             stall_count++;
-            if(stall_count > 1000){
+            if(stall_count > 200){
                 tag_state = tag_poll;
                 stall_count = 0;
             }
