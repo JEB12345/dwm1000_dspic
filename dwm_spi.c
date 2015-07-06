@@ -77,7 +77,7 @@ tag_states tag_state = tag_init;
     //    0.04, 0.51, 0.07,//A8
     //    -0.15, 0.38, -0.01,//A9
     //    -0.12, 0.44, 0.01,//A10
-    0.0, 0.0, 0.0, //dummy for now (EUI = 0)
+    155.8733, 155.8733, 155.8733, //Need to fine tune this parameter
        155.5433333333333,   155.0400000000000,   155.4433333333333,
        155.5766666666667,   154.9922222222222,   155.4500000000000,
        155.4855555555555,   154.9122222222222,   155.3466666666667,
@@ -97,13 +97,13 @@ tag_states tag_state = tag_init;
 
     uint32_t global_tag_poll_tx_time = 0;
 //    uint64_t global_tag_anchor_resp_rx_time = 0;
-    uint32_t global_tag_anchor_resp_rx_time = 0;
+    uint64_t global_tag_anchor_resp_rx_time = 0;
 
 //    uint64_t global_tRP = 0;
     uint32_t global_tRR = 0;
-    uint32_t global_tRP = 0;
+    uint64_t global_tRP = 0;
     uint32_t global_tSR = 0;
-    uint32_t global_tRF = 0;
+    uint64_t global_tRF = 0;
     uint32_t global_tSP = 0;
     uint8_t global_recv_pkt[512];
 
@@ -144,7 +144,7 @@ tag_states tag_state = tag_init;
 //        uint32_t data[2];
         uint32_t tSP;
         uint32_t tSF;
-        uint32_t tRR;
+        uint64_t tRR;
         //uint64_t tRR[NUM_ANCHORS]; // time differences
         uint8_t fcs[2] ;                                  //  we allow space for the CRC as it is logically part of the message. However ScenSor TX calculates and adds these bytes.
     } __attribute__ ((__packed__));
@@ -417,13 +417,13 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
 
             // Get the timestamp first
             uint8_t txTimeStamp[5] = {0, 0, 0, 0, 0};
-            global_tag_anchor_resp_rx_time = dwt_readrxtimestamphi32();
-//            dwt_readrxtimestamp(txTimeStamp);
-//            global_tag_anchor_resp_rx_time = (uint64_t) txTimeStamp[0] +
-//                                             (((uint64_t) txTimeStamp[1]) << 8) +
-//                                             (((uint64_t) txTimeStamp[2]) << 16) +
-//                                             (((uint64_t) txTimeStamp[3]) << 24) +
-//                                             (((uint64_t) txTimeStamp[4]) << 32);
+//            global_tag_anchor_resp_rx_time = dwt_readrxtimestamphi32();
+            dwt_readrxtimestamp(txTimeStamp);
+            global_tag_anchor_resp_rx_time = (uint64_t) txTimeStamp[0] +
+                                             (((uint64_t) txTimeStamp[1]) << 8) +
+                                             (((uint64_t) txTimeStamp[2]) << 16) +
+                                             (((uint64_t) txTimeStamp[3]) << 24) +
+                                             (((uint64_t) txTimeStamp[4]) << 32);
 
             // Get the packet
             dwt_readrxdata(global_recv_pkt, rxd->datalength, 0);
@@ -533,13 +533,13 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
 
 
             // Get the timestamp first
-//            uint8_t txTimeStamp[5] = {0, 0, 0, 0, 0};
-//            dwt_readrxtimestamp(txTimeStamp);
-//            timestamp = (uint64_t) txTimeStamp[0] +
-//                        (((uint64_t) txTimeStamp[1]) << 8) +
-//                        (((uint64_t) txTimeStamp[2]) << 16) +
-//                        (((uint64_t) txTimeStamp[3]) << 24) +
-//                        (((uint64_t) txTimeStamp[4]) << 32);
+            uint8_t txTimeStamp[5] = {0, 0, 0, 0, 0};
+            dwt_readrxtimestamp(txTimeStamp);
+            timestamp = (uint64_t) txTimeStamp[0] +
+                        (((uint64_t) txTimeStamp[1]) << 8) +
+                        (((uint64_t) txTimeStamp[2]) << 16) +
+                        (((uint64_t) txTimeStamp[3]) << 24) +
+                        (((uint64_t) txTimeStamp[4]) << 32);
 
             // tGet the packet
 //            dwt_readrxdata(&packet_type_byte, 1, 15);
@@ -550,8 +550,8 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
 
             if (packet_type_byte == MSG_TYPE_TAG_POLL) {
                 // Got POLL
-//                global_tRP = timestamp;
-                global_tRP = dwt_readrxtimestamphi32();
+                global_tRP = timestamp;
+//                global_tRP = dwt_readrxtimestamphi32();
                 //global_tSP = global_recv_pkt[offsetof(struct ieee154_bcast_msg, tSP)];
                 memcpy(&global_tSP,&global_recv_pkt[offsetof(struct ieee154_bcast_msg, tSP)],sizeof(uint32_t));
 
@@ -602,16 +602,16 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                 // Read the whole packett
                 dwt_readrxdata((uint8_t*)&bcast_msg, sizeof(bcast_msg), 0);
 
-//                global_tRF = timestamp;
-                 global_tRF = dwt_readrxtimestamphi32();
+                global_tRF = timestamp;
+//                 global_tRF = dwt_readrxtimestamphi32();
 
                 //TODO: might need to normalize all times to tSP and tRP
-                long double tRF = (long double)(((uint64_t)global_tRF)<< 8);
+                long double tRF = (long double)(((uint64_t)global_tRF));
                 long double tSR = (long double)(((uint64_t)global_tSR) << 8);
-                long double tRR = (long double)(((uint64_t)bcast_msg.tRR) << 8);//((((uint64_t)bcast_msg.tRR_H)<<32)|(((uint64_t)bcast_msg.tRR_L)));//NCHOR_EUI-1];
+                long double tRR = (long double)(((uint64_t)bcast_msg.tRR));//((((uint64_t)bcast_msg.tRR_H)<<32)|(((uint64_t)bcast_msg.tRR_L)));//NCHOR_EUI-1];
                 long double tSP = (long double)(((uint64_t)global_tSP) << 8);
                 long double tSF = (long double)(((uint64_t)bcast_msg.tSF) << 8);
-                long double tRP = (long double)(((uint64_t)global_tRP) << 8);
+                long double tRP = (long double)(((uint64_t)global_tRP));
 
                 #ifdef DW_DEBUG
                     printf("tRF = %llu\r\n", (uint64_t)tRF);
