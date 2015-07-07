@@ -19,10 +19,12 @@ extern dwm_1000_status dwm_status;
 #define DWM_RESET_ON DWM_RESET_TRIS = 0; DWM_RESET_OUT = 0
 #define DWM_RESET_OFF DWM_RESET_TRIS = 1
 
-#define TAG_SEND_POLL_DELAY_US 300
-#define TAG_SEND_FINAL_DELAY_US 300
-#define ANC_RESP_DELAY 300
+#define TAG_SEND_POLL_DELAY_US 200
+#define TAG_SEND_FINAL_DELAY_US 200
+#define ANC_RESP_DELAY 200
 #define TX_ANTENNA_DELAY 0
+
+#define TWOPOWER40 1099511627776L // decimal value of 2^40 to correct timeroverflow between timestamps
 
 typedef enum {
     tag_init, tag_poll, tag_wait_response, tag_final, tag_stall
@@ -157,6 +159,8 @@ extern "C" {
     /*****https://github.com/lab11/polypoint******/
 
     uint32_t convertmicrosectodevicetimeu32 (double microsecu);
+    
+    uint64_t convertmicrosectodevicetimeu (double microsecu);
 
     void instancesettagsleepdelay(int sleepdelay, int blinksleepdelay);
 
