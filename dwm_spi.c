@@ -152,9 +152,9 @@ tag_states tag_state = tag_init;
         uint8_t sourceAddr[8];
         uint8_t messageType; //   (application data and any user payload)
 //        uint32_t data[2];
-        uint64_t tSP;
-        uint64_t tSF;
-        uint64_t tRR;
+        uint8_t tSP[5];
+        uint8_t tSF[5];
+        uint8_t tRR[NUM_TOTAL_NODES][5];
         //uint64_t tRR[NUM_ANCHORS]; // time differences
         uint8_t fcs[2] ;                                  //  we allow space for the CRC as it is logically part of the message. However ScenSor TX calculates and adds these bytes.
     } __attribute__ ((__packed__));
@@ -162,6 +162,26 @@ tag_states tag_state = tag_init;
     struct ieee154_msg msg;
     struct ieee154_final_msg fin_msg;
     struct ieee154_bcast_msg bcast_msg;
+    
+//    void to_lower_40bits(uint8_t* out, uint64_t in){//too slow!
+//        unsigned i;
+//        for(i=0;i<5;++i){
+//            out[i] = (in>>(i<<3))&0xFF; 
+//        }
+//    }
+#define to_lower_40bits(_OUT,_IN) _OUT[0]=(_IN)&0xFF;_OUT[1]=((_IN)>>8)&0xFF;_OUT[2]=((_IN)>>16)&0xFF;_OUT[3]=((_IN)>>24)&0xFF;_OUT[4]=((_IN)>>32)&0xFF
+    
+//    uint64_t from_lower_40_bits(uint8_t* in){ //too slow!
+//        unsigned i;
+//        uint64_t result = 0;
+//        for(i=0;i<5;++i){
+//            result <<=8;
+//            result |= in[4-i]&0xFF;
+//        }
+//        return result;
+//    }
+#define from_lower_40_bits(_IN) (((_IN)[0])|(((uint64_t)(_IN)[1])<<8)|(((uint64_t)(_IN)[2])<<16)|(((uint64_t)(_IN)[3])<<24)|(((uint64_t)(_IN)[4])<<32))
+    
     /*****https://github.com/lab11/polypoint******/
 
 #define BLINK_SLEEP_DELAY					1000 //ms
@@ -482,8 +502,8 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
 //                uint16_t tx_frame_length = offsetof(struct ieee154_bcast_msg, tRR) + 2;//TODO: this is wrong
                 
                 // Need to actually fill out the packet
-                bcast_msg.tRR = global_tag_anchor_resp_rx_time;
-                bcast_msg.tSF = systimestamp + (convertmicrosectodevicetimeu(TAG_SEND_FINAL_DELAY_US));
+                to_lower_40bits(bcast_msg.tRR[0], global_tag_anchor_resp_rx_time);
+                to_lower_40bits(bcast_msg.tSF,systimestamp + (convertmicrosectodevicetimeu(TAG_SEND_FINAL_DELAY_US)));
                 
                 dwt_writetxdata(tx_frame_length, (uint8_t*) &bcast_msg, 0);
                 err = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
@@ -533,7 +553,8 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                 // Got POLL
                 global_tRP = rxtimestamp;
 //                global_tRP = dwt_readrxtimestamphi32();
-                memcpy(&global_tSP,&global_recv_pkt[offsetof(struct ieee154_bcast_msg, tSP)],sizeof(uint64_t));
+                //memcpy(&global_tSP,&global_recv_pkt[offsetof(struct ieee154_bcast_msg, tSP)],sizeof(uint64_t));
+                global_tSP = from_lower_40_bits(&global_recv_pkt[offsetof(struct ieee154_bcast_msg, tSP)]);
 
                 // Send response
                 dwt_forcetrxoff();
@@ -586,15 +607,20 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                 global_tRF = rxtimestamp;
 //                 global_tRF = dwt_readrxtimestamphi32();
 
-                // ONLY WORKS IF VARIABLE ARE 64bits!!!
+                // ONLY WORKS IF VARIABLES ARE 64bits!!!
                 // Correct TAG Times if rollover
-                if(global_tSP > bcast_msg.tRR){
-                    bcast_msg.tRR += TWOPOWER40;
-                    bcast_msg.tSF += TWOPOWER40;
+                uint64_t tRR_tmp = from_lower_40_bits(bcast_msg.tRR[0]);
+                uint64_t tSF_tmp = from_lower_40_bits(bcast_msg.tSF);
+                if(global_tSP > tRR_tmp){
+                    tRR_tmp += TWOPOWER40;
+                    tSF_tmp += TWOPOWER40;
                 }
-                if(bcast_msg.tRR > bcast_msg.tSF){
-                    bcast_msg.tSF += TWOPOWER40;
+                if(tRR_tmp > tSF_tmp){
+                    tSF_tmp += TWOPOWER40;
                 }
+                to_lower_40bits(bcast_msg.tRR[0],tRR_tmp);
+                to_lower_40bits(bcast_msg.tSF,tSF_tmp);
+                
                 // Correct ANCHOR times if rollover
                 if(global_tRP > global_tSR){
                     global_tSR += TWOPOWER40;
@@ -606,9 +632,9 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
 
                 long double tRF = (long double)(((uint64_t)global_tRF));
                 long double tSR = (long double)(((uint64_t)global_tSR));
-                long double tRR = (long double)(((uint64_t)bcast_msg.tRR));//((((uint64_t)bcast_msg.tRR_H)<<32)|(((uint64_t)bcast_msg.tRR_L)));//NCHOR_EUI-1];
+                long double tRR = (long double)from_lower_40_bits(bcast_msg.tRR[0]);//((((uint64_t)bcast_msg.tRR_H)<<32)|(((uint64_t)bcast_msg.tRR_L)));//NCHOR_EUI-1];
                 long double tSP = (long double)(((uint64_t)global_tSP));
-                long double tSF = (long double)(((uint64_t)bcast_msg.tSF));
+                long double tSF = (long double)from_lower_40_bits(bcast_msg.tSF);
                 long double tRP = (long double)(((uint64_t)global_tRP));
 
                 if(tRF != 0.0 && tSR != 0.0 && tRR != 0.0 && tSP != 0.0 && tSF != 0.0 && tRP != 0.0){
@@ -653,8 +679,8 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
 
 void send_poll(){
     //Reset all the tRRs at the beginning of each poll event
-	//memset(bcast_msg.tRR, 0, sizeof(bcast_msg.tRR));//TODO: hacked
-    bcast_msg.tRR = 0;//_H = bcast_msg.tRR_L = 0;
+	memset(bcast_msg.tRR, 0, sizeof(bcast_msg.tRR));//TODO: hacked
+    //bcast_msg.tRR = 0;//_H = bcast_msg.tRR_L = 0;
     
 	// Through tSP (tSF is field after) then +2 for FCS
     uint16_t tx_frame_length = sizeof(bcast_msg);
@@ -691,8 +717,9 @@ void send_poll(){
 	//uint32_t delay_time = dwt_readsystimestamphi32() + GLOBAL_PKT_DELAY_UPPER32;
 	delay_time &= 0xFFFFFFFE; //Make sure last bit is zero
 	dwt_setdelayedtrxtime(delay_time);
-	bcast_msg.tSP = systimestamp + (convertmicrosectodevicetimeu(TAG_SEND_POLL_DELAY_US));
-
+    uint64_t tSP_tmp = systimestamp + (convertmicrosectodevicetimeu(TAG_SEND_POLL_DELAY_US));
+    to_lower_40bits(bcast_msg.tSP,tSP_tmp);
+	
 	// Write the data
 	dwt_writetxdata(tx_frame_length, (uint8_t*) &bcast_msg, 0);
 

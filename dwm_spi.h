@@ -19,8 +19,8 @@ extern dwm_1000_status dwm_status;
 #define DWM_RESET_ON DWM_RESET_TRIS = 0; DWM_RESET_OUT = 0
 #define DWM_RESET_OFF DWM_RESET_TRIS = 1
 
-#define TAG_SEND_POLL_DELAY_US 200
-#define TAG_SEND_FINAL_DELAY_US 200
+#define TAG_SEND_POLL_DELAY_US 400
+#define TAG_SEND_FINAL_DELAY_US 400
 #define ANC_RESP_DELAY 200
 #define TX_ANTENNA_DELAY 0
 
@@ -72,6 +72,10 @@ typedef enum {
 #define DELAY_MASK 0x00FFFFFFFE00
 #define NUM_ANTENNAS 1
 #define NUM_CHANNELS 1
+
+#define NUM_FLOATING_NODES  12 //nodes on robot
+#define NUM_FIXED_NODES     4  //fixed nodes (reference)
+#define NUM_TOTAL_NODES     16 //sum of NUM_FLOATING_NODES and NUM_FIXED_NODES
 
 
 /*****https://github.com/lab11/polypoint******/
