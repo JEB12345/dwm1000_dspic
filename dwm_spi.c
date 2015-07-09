@@ -163,10 +163,21 @@ tag_states tag_state = tag_init;
         //uint64_t tRR[NUM_ANCHORS]; // time differences
         uint8_t fcs[2] ;                                  //  we allow space for the CRC as it is logically part of the message. However ScenSor TX calculates and adds these bytes.
     } __attribute__ ((__packed__));
+    
+    struct ieee154_test_msg  {
+        uint8_t frameCtrl[2];                             //  frame control bytes 00-01
+        uint8_t seqNum;                                   //  sequence_number 02
+        uint8_t panID[2];                                 //  PAN ID 03-04
+        uint8_t sourceAddr;
+        uint8_t messageType; //   (application data and any user payload)
+        uint8_t value;
+        uint8_t fcs[2] ;                                  //  we allow space for the CRC as it is logically part of the message. However ScenSor TX calculates and adds these bytes.
+    } __attribute__ ((__packed__));
 
     struct ieee154_msg msg;
     struct ieee154_final_msg fin_msg;
     struct ieee154_bcast_msg bcast_msg;
+    struct ieee154_test_msg test_msg;
     
 //    void to_lower_40bits(uint8_t* out, uint64_t in){//too slow!
 //        unsigned i;
@@ -329,6 +340,12 @@ uint8_t dwm_init()
     bcast_msg.panID[1] = DW1000_PANID >> 8;
     bcast_msg.seqNum = 0;
 //    bcast_msg.subSeqNum = 0;
+    
+    test_msg.frameCtrl[0] = 0x41; // data frame, ack req, panid comp
+    test_msg.frameCtrl[1] = 0xC8; // ext addr
+    test_msg.panID[0] = DW1000_PANID & 0xff;
+    test_msg.panID[1] = DW1000_PANID >> 8;
+    test_msg.seqNum = 0;
 
     // Calculate the delay between packet reception and transmission.
     // This applies to the time between POLL and RESPONSE (on the anchor side)
@@ -411,247 +428,307 @@ uint8_t dwm_init()
 // Triggered after a TX
 void app_dw1000_txcallback (const dwt_callback_data_t *txd) {
     //NOTE: No need for tx timestamping after-the-fact (everything's done beforehand)
+    
 }
 
 // Triggered when we receive a packet
 void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
     int err;
-
-//    if (DW1000_ROLE_TYPE == TAG) {
-
-        // The tag receives one packet: "ANCHOR RESPONSE"
-        // Make sure the packet is valid and matches an anchor response.
-        // Need to timestamp it and schedule a response.
-
-        if (rxd->event == DWT_SIG_RX_OKAY) {
-            struct ieee154_msg* msg_ptr;
-            uint8_t packet_type_byte;
-            struct ieee154_bcast_msg* bmsg_ptr;
-            uint8_t packet_type_byte;
-            uint64_t rxtimestamp;
-            uint64_t systimestamp;
-            uint8_t subseq_num;
-
-            // Get the timestamp first
-            uint8_t txTimeStamp[5] = {0, 0, 0, 0, 0};
-//            global_tag_anchor_resp_rx_time = dwt_readrxtimestamphi32();
-            dwt_readrxtimestamp(txTimeStamp);
-            global_tag_anchor_resp_rx_time = (uint64_t) txTimeStamp[0] +
-                                             (((uint64_t) txTimeStamp[1]) << 8) +
-                                             (((uint64_t) txTimeStamp[2]) << 16) +
-                                             (((uint64_t) txTimeStamp[3]) << 24) +
-                                             (((uint64_t) txTimeStamp[4]) << 32);
-
-            // Get the packet
-            dwt_readrxdata(global_recv_pkt, rxd->datalength, 0);
-            msg_ptr = (struct ieee154_msg*) global_recv_pkt;
-            packet_type_byte = global_recv_pkt[offsetof(struct ieee154_msg, messageType)];
-
-            // Packet type byte is at a know location
-            if (packet_type_byte == MSG_TYPE_ANC_RESP) {
-                // Great, got an anchor response.
-                // Now send a final message with the timings we know in it
-
-                // First, set the time we want the packet to go out at.
-                // This is based on our precalculated delay plus when we got
-                // the anchor response packet. Note that we only add the upper
-                // 32 bits together and use that time because this chip is
-                // weird.
-                uint8_t anchor_id = msg_ptr->anchorID;
-
-                dwt_forcetrxoff();
-                uint16_t tx_frame_length = sizeof(bcast_msg);
-                
-                bcast_msg.seqNum++;
-                bcast_msg.messageType = MSG_TYPE_TAG_FINAL;
-                // Put at beginning of TX fifo
-                dwt_writetxfctrl(tx_frame_length, 0);
-                
-                dwt_setrxtimeout(0);
-                
-                uint8_t TimeStamp[5] = {0, 0, 0, 0, 0};
-                dwt_readsystime(TimeStamp);
-                uint64_t systimestamp = (uint64_t) TimeStamp[0] +
-                        (((uint64_t) TimeStamp[1]) << 8) +
-                        (((uint64_t) TimeStamp[2]) << 16) +
-                        (((uint64_t) TimeStamp[3]) << 24) +
-                        (((uint64_t) TimeStamp[4]) << 32);
-
-                //TODO: Hack.... But not sure of any other way to get this to time out correctly...
-//                dwt_setrxtimeout(NODE_DELAY_US*(NUM_ANCHORS-anchor_id)+ANC_RESP_DELAY+1000);
-//                uint32_t temp = dwt_readsystimestamphi32();
-//                uint32_t delay_time = temp + ((convertmicrosectodevicetimeu32(TAG_SEND_FINAL_DELAY_US)>>8));
-                uint32_t delay_time = (uint32_t)((systimestamp)>>8) + ((convertmicrosectodevicetimeu32(TAG_SEND_FINAL_DELAY_US)>>8));
-                delay_time &= 0xFFFFFFFE;
-                dwt_setdelayedtrxtime(delay_time);
-                // Set the packet length
-//                uint16_t tx_frame_length = offsetof(struct ieee154_bcast_msg, tRR) + 2;//TODO: this is wrong
-                
-                // Need to actually fill out the packet
-                to_lower_40bits(bcast_msg.tRR[0], global_tag_anchor_resp_rx_time);
-                to_lower_40bits(bcast_msg.tSF,systimestamp + (convertmicrosectodevicetimeu(TAG_SEND_FINAL_DELAY_US)));
-                
-                dwt_writetxdata(tx_frame_length, (uint8_t*) &bcast_msg, 0);
-                err = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
-                dwt_settxantennadelay(global_tx_antenna_delay);
-                tag_state = tag_stall;
-
-            } else if(packet_type_byte == MSG_TYPE_ANC_FINAL){
-                struct ieee154_final_msg* final_msg_ptr;
-                final_msg_ptr = (struct ieee154_final_msg*) global_recv_pkt;
-                int offset_idx = (final_msg_ptr->anchorID-1)*NUM_ANTENNAS*NUM_ANTENNAS*NUM_CHANNELS;
-                memcpy(&global_distances[offset_idx],final_msg_ptr->distanceHist,sizeof(fin_msg.distanceHist));
+    static unsigned delayed_tx = 0;
+    if (rxd->event == DWT_SIG_RX_OKAY) {
+        dwt_readrxdata(global_recv_pkt, rxd->datalength, 0);
+    
+#ifdef IS_TAG
+        //just read packet, but ignore
+        //sending data in main loop
+        struct ieee154_test_msg* msg_ptr;
+        msg_ptr = (struct ieee154_test_msg*) global_recv_pkt;
+        if(msg_ptr->value==2){
+            //ignore
+        }
+#else
+        //convert to test_msg
+        struct ieee154_test_msg* msg_ptr;
+        msg_ptr = (struct ieee154_test_msg*) global_recv_pkt;
+        if(msg_ptr->value==1){
+            //do a delayed transmit            
+            dwt_forcetrxoff();
+            uint16_t tx_frame_length = sizeof (test_msg);
+            // Put at beginning of TX fifo
+            dwt_writetxfctrl(tx_frame_length, 0);
+            dwt_setrxtimeout(0);
+            uint8_t TimeStamp[5] = {0, 0, 0, 0, 0};
+            dwt_readsystime(TimeStamp);
+            uint64_t systimestamp = from_lower_40_bits(TimeStamp);
+            uint32_t delay_time = (uint32_t) ((systimestamp) >> 8) + ((convertmicrosectodevicetimeu32(10000) >> 8));
+            delay_time &= 0xFFFFFFFE;
+            dwt_setdelayedtrxtime(delay_time);
+            // Need to actually fill out the packet
+            test_msg.value = 2;
+            dwt_writetxdata(tx_frame_length, (uint8_t*) & test_msg, 0);
+            err = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
+            dwt_settxantennadelay(global_tx_antenna_delay);
+            delayed_tx = 1;
+        } else {
+            //check if we're in a delayed transmit state?
+            if(delayed_tx){
+                delayed_tx = 0;
             }
-//        } else if (rxd->event == DWT_SIG_RX_TIMEOUT) {
-//
-//        }
-
-//    } else if (DW1000_ROLE_TYPE == ANCHOR) {
-
-        // The anchor should receive two packets: a POLL from a tag and
-        // a FINAL from a tag.
-
-//        if (rxd->event == DWT_SIG_RX_OKAY) {
-
-            // Get the timestamp first
-            uint8_t txTimeStamp[5] = {0, 0, 0, 0, 0};
-            dwt_readrxtimestamp(txTimeStamp);
-            rxtimestamp = (uint64_t) txTimeStamp[0] +
-                        (((uint64_t) txTimeStamp[1]) << 8) +
-                        (((uint64_t) txTimeStamp[2]) << 16) +
-                        (((uint64_t) txTimeStamp[3]) << 24) +
-                        (((uint64_t) txTimeStamp[4]) << 32);
-
-            // tGet the packet
-//            dwt_readrxdata(&packet_type_byte, 1, 15);
-            dwt_readrxdata(global_recv_pkt, rxd->datalength, 0);
-            bmsg_ptr = (struct ieee154_bcast_msg*) global_recv_pkt;
-            packet_type_byte = global_recv_pkt[offsetof(struct ieee154_bcast_msg, messageType)];
-
-
-            if (packet_type_byte == MSG_TYPE_TAG_POLL) {
-                // Got POLL
-                global_tRP = rxtimestamp;
-//                global_tRP = dwt_readrxtimestamphi32();
-                //memcpy(&global_tSP,&global_recv_pkt[offsetof(struct ieee154_bcast_msg, tSP)],sizeof(uint64_t));
-                global_tSP = from_lower_40_bits(&global_recv_pkt[offsetof(struct ieee154_bcast_msg, tSP)]);
-
-                // Send response
-                dwt_forcetrxoff();
-                
-                // Set the packet length
-                // FCS + SEQ + PANID:  5
-                // ADDR:              16
-                // PKT:                1
-                // ANCHOR_ID:          1
-                // CRC:                2
-                // total              25
-                uint16_t tx_frame_length = sizeof(msg); // Should be 25
-                
-                dwt_writetxfctrl(tx_frame_length, 0);
-                
-                dwt_setrxtimeout(0);
-                
-                uint8_t TimeStamp[5] = {0, 0, 0, 0, 0};
-                dwt_readsystime(TimeStamp);
-                systimestamp = (uint64_t) TimeStamp[0] +
-                        (((uint64_t) TimeStamp[1]) << 8) +
-                        (((uint64_t) TimeStamp[2]) << 16) +
-                        (((uint64_t) TimeStamp[3]) << 24) +
-                        (((uint64_t) TimeStamp[4]) << 32);
-
-                // Calculate the delay
-//                uint32_t dwt_time = dwt_readsystimestamphi32();
-//                uint32_t delay_time = dwt_time + (convertmicrosectodevicetimeu32(ANC_RESP_DELAY)>>8);
-                uint32_t delay_time = (uint32_t)((systimestamp)>>8) + (convertmicrosectodevicetimeu32(ANC_RESP_DELAY)>>8);
-                delay_time &= 0xFFFFFFFE;
-                dwt_setdelayedtrxtime(delay_time);
-                global_tSR = systimestamp + (convertmicrosectodevicetimeu(ANC_RESP_DELAY));
-
-                dwt_writetxdata(tx_frame_length, (uint8_t*) &msg, 0);
-
-                err = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
-                
-                dwt_settxantennadelay(global_tx_antenna_delay);
-
-                anchor_state = anchor_wait_final;
-            } else if (packet_type_byte == MSG_TYPE_TAG_FINAL) {
-                // Got FINAL
-
-                // Read the whole packett
-                dwt_readrxdata((uint8_t*)&bcast_msg, sizeof(bcast_msg), 0);
-
-                global_tRF = rxtimestamp;
-//                 global_tRF = dwt_readrxtimestamphi32();
-
-                // ONLY WORKS IF VARIABLES ARE 64bits!!!
-                // Correct TAG Times if rollover
-                uint64_t tRR_tmp = from_lower_40_bits(bcast_msg.tRR[0]);
-                uint64_t tSF_tmp = from_lower_40_bits(bcast_msg.tSF);
-                if(global_tSP > tRR_tmp){
-                    tRR_tmp += TWOPOWER40;
-                    tSF_tmp += TWOPOWER40;
-                }
-                if(tRR_tmp > tSF_tmp){
-                    tSF_tmp += TWOPOWER40;
-                }
-                to_lower_40bits(bcast_msg.tRR[0],tRR_tmp);
-                to_lower_40bits(bcast_msg.tSF,tSF_tmp);
-                
-                // Correct ANCHOR times if rollover
-                if(global_tRP > global_tSR){
-                    global_tSR += TWOPOWER40;
-                    global_tRF += TWOPOWER40;
-                }
-                if(global_tSR > global_tRF){
-                    global_tRF += TWOPOWER40;
-                }
-
-                long double tRF = (long double)(((uint64_t)global_tRF));
-                long double tSR = (long double)(((uint64_t)global_tSR));
-                long double tRR = (long double)from_lower_40_bits(bcast_msg.tRR[0]);//((((uint64_t)bcast_msg.tRR_H)<<32)|(((uint64_t)bcast_msg.tRR_L)));//NCHOR_EUI-1];
-                long double tSP = (long double)(((uint64_t)global_tSP));
-                long double tSF = (long double)from_lower_40_bits(bcast_msg.tSF);
-                long double tRP = (long double)(((uint64_t)global_tRP));
-
-                if(tRF != 0.0 && tSR != 0.0 && tRR != 0.0 && tSP != 0.0 && tSF != 0.0 && tRP != 0.0){
-                    
-                    long double aot = (tRF-tRP)/(tSF-tSP);
-                    long double tTOF = (tRF-tSR)-(tSF-tRR)*aot;
-                    long double dist = (tTOF*DWT_TIME_UNITS)/2;
-
-                    ////tTOF^2 + (-tRF + tSR - tRR + tSP)*tTOF + (tRR*tRF - tSP*tRF - tSR*tRR + tSP*tSR - (tSF-tRR)*(tSR-tRP)) = 0
-//                    double a = 1.0;
-//                    double b = -tRF + tSR - tRR + tSP;
-//                    double c = tRR*tRF - tSP*tRF - tSR*tRR + tSP*tSR - (tSF-tRR)*(tSR-tRP);
-//
-//                    ////Perform quadratic equation
-//                    double tTOF = (-b-sqrt(pow(b,2)-4*a*c))/(2*a);
-//                    double dist = (tTOF * (double) DWT_TIME_UNITS) * 0.5;
-                    dist *= SPEED_OF_LIGHT;
-                    //double range_bias = 0.0;//dwt_getrangebias(global_chan, (float) dist, DWT_PRF_64M);
-#ifndef DW_CAL_TRX_DELAY
-                    dist += ANCHOR_CAL_LEN;
-                    dist -= txDelayCal[0]; //This can be used to calibrate the error based on different nodes... need to implement
+        }
 #endif
-                    #ifdef DW_DEBUG
-                        printf("dist*100 = %d\r\n", (int)(dist*100));
-                        //printf("range_bias*100 = %d\r\n", (int)(range_bias*100));
-                    #endif
-                    //dist -= dwt_getrangebias(2, (float) dist, DWT_PRF_64M);
-                    fin_msg.distanceHist[global_subseq_num] = (float)dist;
-                    dwm_status.distance = dist;
-                }
-
-                // Get ready to receive next POLL
-                anchor_state = anchor_wait_receive;
-                dwt_rxenable(0);
-            }
-        }
-        else{
-            dwt_rxenable(0);
-        }
+    }
+    
+//    //Here's the plan
+//    if(poll && poll.sender==0){
+//        //send delayed poll
+//        //send delayed response
+//        //send delayed final message
+//    } else if(poll){
+//        //store timing  info from "tag"
+//    } else if(response){
+//        //record tRR & tSF
+//    } else if(final){
+//        //compute result
 //    }
+    
+    
+    
+    
+////    if (DW1000_ROLE_TYPE == TAG) {
+//
+//        // The tag receives one packet: "ANCHOR RESPONSE"
+//        // Make sure the packet is valid and matches an anchor response.
+//        // Need to timestamp it and schedule a response.
+//
+//        if (rxd->event == DWT_SIG_RX_OKAY) {
+//            struct ieee154_msg* msg_ptr;
+//            uint8_t packet_type_byte;
+//            struct ieee154_bcast_msg* bmsg_ptr;
+//            //uint8_t packet_type_byte;
+//            uint64_t rxtimestamp;
+//            uint64_t systimestamp;
+//            uint8_t subseq_num;
+//
+//            // Get the timestamp first
+//            uint8_t txTimeStamp[5] = {0, 0, 0, 0, 0};
+////            global_tag_anchor_resp_rx_time = dwt_readrxtimestamphi32();
+//            dwt_readrxtimestamp(txTimeStamp);
+//            global_tag_anchor_resp_rx_time = (uint64_t) txTimeStamp[0] +
+//                                             (((uint64_t) txTimeStamp[1]) << 8) +
+//                                             (((uint64_t) txTimeStamp[2]) << 16) +
+//                                             (((uint64_t) txTimeStamp[3]) << 24) +
+//                                             (((uint64_t) txTimeStamp[4]) << 32);
+//
+//            // Get the packet
+//            dwt_readrxdata(global_recv_pkt, rxd->datalength, 0);
+//            msg_ptr = (struct ieee154_msg*) global_recv_pkt;
+//            packet_type_byte = global_recv_pkt[offsetof(struct ieee154_msg, messageType)];
+//
+//            // Packet type byte is at a know location
+//            if (packet_type_byte == MSG_TYPE_ANC_RESP) {
+//                // Great, got an anchor response.
+//                // Now send a final message with the timings we know in it
+//
+//                // First, set the time we want the packet to go out at.
+//                // This is based on our precalculated delay plus when we got
+//                // the anchor response packet. Note that we only add the upper
+//                // 32 bits together and use that time because this chip is
+//                // weird.
+//                uint8_t anchor_id = msg_ptr->anchorID;
+//
+//                dwt_forcetrxoff();
+//                uint16_t tx_frame_length = sizeof(bcast_msg);
+//                
+//                bcast_msg.seqNum++;
+//                bcast_msg.messageType = MSG_TYPE_TAG_FINAL;
+//                // Put at beginning of TX fifo
+//                dwt_writetxfctrl(tx_frame_length, 0);
+//                
+//                dwt_setrxtimeout(0);
+//                
+//                uint8_t TimeStamp[5] = {0, 0, 0, 0, 0};
+//                dwt_readsystime(TimeStamp);
+//                uint64_t systimestamp = (uint64_t) TimeStamp[0] +
+//                        (((uint64_t) TimeStamp[1]) << 8) +
+//                        (((uint64_t) TimeStamp[2]) << 16) +
+//                        (((uint64_t) TimeStamp[3]) << 24) +
+//                        (((uint64_t) TimeStamp[4]) << 32);
+//
+//                //TODO: Hack.... But not sure of any other way to get this to time out correctly...
+////                dwt_setrxtimeout(NODE_DELAY_US*(NUM_ANCHORS-anchor_id)+ANC_RESP_DELAY+1000);
+////                uint32_t temp = dwt_readsystimestamphi32();
+////                uint32_t delay_time = temp + ((convertmicrosectodevicetimeu32(TAG_SEND_FINAL_DELAY_US)>>8));
+//                uint32_t delay_time = (uint32_t)((systimestamp)>>8) + ((convertmicrosectodevicetimeu32(TAG_SEND_FINAL_DELAY_US)>>8));
+//                delay_time &= 0xFFFFFFFE;
+//                dwt_setdelayedtrxtime(delay_time);
+//                // Set the packet length
+////                uint16_t tx_frame_length = offsetof(struct ieee154_bcast_msg, tRR) + 2;//TODO: this is wrong
+//                
+//                // Need to actually fill out the packet
+//                to_lower_40bits(bcast_msg.tRR[0], global_tag_anchor_resp_rx_time);
+//                to_lower_40bits(bcast_msg.tSF,systimestamp + (convertmicrosectodevicetimeu(TAG_SEND_FINAL_DELAY_US)));
+//                
+//                dwt_writetxdata(tx_frame_length, (uint8_t*) &bcast_msg, 0);
+//                err = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
+//                dwt_settxantennadelay(global_tx_antenna_delay);
+//                tag_state = tag_stall;
+//
+//            } else if(packet_type_byte == MSG_TYPE_ANC_FINAL){
+//                struct ieee154_final_msg* final_msg_ptr;
+//                final_msg_ptr = (struct ieee154_final_msg*) global_recv_pkt;
+//                int offset_idx = (final_msg_ptr->anchorID-1)*NUM_ANTENNAS*NUM_ANTENNAS*NUM_CHANNELS;
+//                memcpy(&global_distances[offset_idx],final_msg_ptr->distanceHist,sizeof(fin_msg.distanceHist));
+//            }
+////        } else if (rxd->event == DWT_SIG_RX_TIMEOUT) {
+////
+////        }
+//
+////    } else if (DW1000_ROLE_TYPE == ANCHOR) {
+//
+//        // The anchor should receive two packets: a POLL from a tag and
+//        // a FINAL from a tag.
+//
+////        if (rxd->event == DWT_SIG_RX_OKAY) {
+//
+//            // Get the timestamp first
+//            uint8_t txTimeStamp[5] = {0, 0, 0, 0, 0};
+//            dwt_readrxtimestamp(txTimeStamp);
+//            rxtimestamp = (uint64_t) txTimeStamp[0] +
+//                        (((uint64_t) txTimeStamp[1]) << 8) +
+//                        (((uint64_t) txTimeStamp[2]) << 16) +
+//                        (((uint64_t) txTimeStamp[3]) << 24) +
+//                        (((uint64_t) txTimeStamp[4]) << 32);
+//
+//            // tGet the packet
+////            dwt_readrxdata(&packet_type_byte, 1, 15);
+//            dwt_readrxdata(global_recv_pkt, rxd->datalength, 0);
+//            bmsg_ptr = (struct ieee154_bcast_msg*) global_recv_pkt;
+//            packet_type_byte = global_recv_pkt[offsetof(struct ieee154_bcast_msg, messageType)];
+//
+//
+//            if (packet_type_byte == MSG_TYPE_TAG_POLL) {
+//                // Got POLL
+//                global_tRP = rxtimestamp;
+////                global_tRP = dwt_readrxtimestamphi32();
+//                //memcpy(&global_tSP,&global_recv_pkt[offsetof(struct ieee154_bcast_msg, tSP)],sizeof(uint64_t));
+//                global_tSP = from_lower_40_bits(&global_recv_pkt[offsetof(struct ieee154_bcast_msg, tSP)]);
+//
+//                // Send response
+//                dwt_forcetrxoff();
+//                
+//                // Set the packet length
+//                // FCS + SEQ + PANID:  5
+//                // ADDR:              16
+//                // PKT:                1
+//                // ANCHOR_ID:          1
+//                // CRC:                2
+//                // total              25
+//                uint16_t tx_frame_length = sizeof(msg); // Should be 25
+//                
+//                dwt_writetxfctrl(tx_frame_length, 0);
+//                
+//                dwt_setrxtimeout(0);
+//                
+//                uint8_t TimeStamp[5] = {0, 0, 0, 0, 0};
+//                dwt_readsystime(TimeStamp);
+//                systimestamp = (uint64_t) TimeStamp[0] +
+//                        (((uint64_t) TimeStamp[1]) << 8) +
+//                        (((uint64_t) TimeStamp[2]) << 16) +
+//                        (((uint64_t) TimeStamp[3]) << 24) +
+//                        (((uint64_t) TimeStamp[4]) << 32);
+//
+//                // Calculate the delay
+////                uint32_t dwt_time = dwt_readsystimestamphi32();
+////                uint32_t delay_time = dwt_time + (convertmicrosectodevicetimeu32(ANC_RESP_DELAY)>>8);
+//                uint32_t delay_time = (uint32_t)((systimestamp)>>8) + (convertmicrosectodevicetimeu32(ANC_RESP_DELAY)>>8);
+//                delay_time &= 0xFFFFFFFE;
+//                dwt_setdelayedtrxtime(delay_time);
+//                global_tSR = systimestamp + (convertmicrosectodevicetimeu(ANC_RESP_DELAY));
+//
+//                dwt_writetxdata(tx_frame_length, (uint8_t*) &msg, 0);
+//
+//                err = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
+//                
+//                dwt_settxantennadelay(global_tx_antenna_delay);
+//
+//                anchor_state = anchor_wait_final;
+//            } else if (packet_type_byte == MSG_TYPE_TAG_FINAL) {
+//                // Got FINAL
+//
+//                // Read the whole packett
+//                dwt_readrxdata((uint8_t*)&bcast_msg, sizeof(bcast_msg), 0);
+//
+//                global_tRF = rxtimestamp;
+////                 global_tRF = dwt_readrxtimestamphi32();
+//
+//                // ONLY WORKS IF VARIABLES ARE 64bits!!!
+//                // Correct TAG Times if rollover
+//                uint64_t tRR_tmp = from_lower_40_bits(bcast_msg.tRR[0]);
+//                uint64_t tSF_tmp = from_lower_40_bits(bcast_msg.tSF);
+//                if(global_tSP > tRR_tmp){
+//                    tRR_tmp += TWOPOWER40;
+//                    tSF_tmp += TWOPOWER40;
+//                }
+//                if(tRR_tmp > tSF_tmp){
+//                    tSF_tmp += TWOPOWER40;
+//                }
+//                to_lower_40bits(bcast_msg.tRR[0],tRR_tmp);
+//                to_lower_40bits(bcast_msg.tSF,tSF_tmp);
+//                
+//                // Correct ANCHOR times if rollover
+//                if(global_tRP > global_tSR){
+//                    global_tSR += TWOPOWER40;
+//                    global_tRF += TWOPOWER40;
+//                }
+//                if(global_tSR > global_tRF){
+//                    global_tRF += TWOPOWER40;
+//                }
+//
+//                long double tRF = (long double)(((uint64_t)global_tRF));
+//                long double tSR = (long double)(((uint64_t)global_tSR));
+//                long double tRR = (long double)from_lower_40_bits(bcast_msg.tRR[0]);//((((uint64_t)bcast_msg.tRR_H)<<32)|(((uint64_t)bcast_msg.tRR_L)));//NCHOR_EUI-1];
+//                long double tSP = (long double)(((uint64_t)global_tSP));
+//                long double tSF = (long double)from_lower_40_bits(bcast_msg.tSF);
+//                long double tRP = (long double)(((uint64_t)global_tRP));
+//
+//                if(tRF != 0.0 && tSR != 0.0 && tRR != 0.0 && tSP != 0.0 && tSF != 0.0 && tRP != 0.0){
+//                    
+//                    long double aot = (tRF-tRP)/(tSF-tSP);
+//                    long double tTOF = (tRF-tSR)-(tSF-tRR)*aot;
+//                    long double dist = (tTOF*DWT_TIME_UNITS)/2;
+//
+//                    ////tTOF^2 + (-tRF + tSR - tRR + tSP)*tTOF + (tRR*tRF - tSP*tRF - tSR*tRR + tSP*tSR - (tSF-tRR)*(tSR-tRP)) = 0
+////                    double a = 1.0;
+////                    double b = -tRF + tSR - tRR + tSP;
+////                    double c = tRR*tRF - tSP*tRF - tSR*tRR + tSP*tSR - (tSF-tRR)*(tSR-tRP);
+////
+////                    ////Perform quadratic equation
+////                    double tTOF = (-b-sqrt(pow(b,2)-4*a*c))/(2*a);
+////                    double dist = (tTOF * (double) DWT_TIME_UNITS) * 0.5;
+//                    dist *= SPEED_OF_LIGHT;
+//                    //double range_bias = 0.0;//dwt_getrangebias(global_chan, (float) dist, DWT_PRF_64M);
+//#ifndef DW_CAL_TRX_DELAY
+//                    dist += ANCHOR_CAL_LEN;
+//                    dist -= txDelayCal[0]; //This can be used to calibrate the error based on different nodes... need to implement
+//#endif
+//                    #ifdef DW_DEBUG
+//                        printf("dist*100 = %d\r\n", (int)(dist*100));
+//                        //printf("range_bias*100 = %d\r\n", (int)(range_bias*100));
+//                    #endif
+//                    //dist -= dwt_getrangebias(2, (float) dist, DWT_PRF_64M);
+//                    fin_msg.distanceHist[global_subseq_num] = (float)dist;
+//                    dwm_status.distance = dist;
+//                }
+//
+//                // Get ready to receive next POLL
+//                anchor_state = anchor_wait_receive;
+//                dwt_rxenable(0);
+//            }
+//        }
+//        else{
+//            dwt_rxenable(0);
+//        }
+////    }
 }
 
 void send_poll(){
@@ -703,34 +780,63 @@ void send_poll(){
 }
 
 void instance_process(){
-    
-    switch(multiBroadcast_states){
-        case init:
-            multiBroadcast_states = poll;
-            break;
-            
-        case poll:
-            stall_count = 0;
-//            dwt_forcetrxoff();  // Force the tx or rx state off
-            send_poll();
-            multiBroadcast_states = wait_response;
-            break;
-            
-        case wait_receive:
-            break;
-            
-        case wait_response:
-            break;
-            
-        case wait_final:
-            break;
-            
-        case final:
-            break;
-            
-        case stall:
-            break;
+#ifdef IS_TAG
+    static unsigned ctr = 0;
+    if(ctr%5==0){
+    //send packet
+    dwt_forcetrxoff();
+    uint16_t tx_frame_length = sizeof (test_msg);
+    // Put at beginning of TX fifo
+    dwt_writetxfctrl(tx_frame_length, 0);
+    dwt_setrxtimeout(0);
+    uint8_t TimeStamp[5] = {0, 0, 0, 0, 0};
+    dwt_readsystime(TimeStamp);
+    uint64_t systimestamp = from_lower_40_bits(TimeStamp);
+    uint32_t delay_time = (uint32_t) ((systimestamp) >> 8) + ((convertmicrosectodevicetimeu32(400) >> 8));
+    delay_time &= 0xFFFFFFFE;
+    dwt_setdelayedtrxtime(delay_time);
+    // Need to actually fill out the packet
+    if(ctr==0){
+        test_msg.value = 1;
+    } else {
+        test_msg.value = 0;
     }
+    dwt_writetxdata(tx_frame_length, (uint8_t*) & test_msg, 0);
+    int err = dwt_starttx(DWT_START_TX_IMMEDIATE);//DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
+    dwt_settxantennadelay(global_tx_antenna_delay);
+    }
+    if(++ctr>100){
+        ctr = 0;
+    }
+#else
+#endif
+//    switch(multiBroadcast_states){
+//        case init:
+//            multiBroadcast_states = poll;
+//            break;
+//            
+//        case poll:
+//            stall_count = 0;
+////            dwt_forcetrxoff();  // Force the tx or rx state off
+//            send_poll();
+//            multiBroadcast_states = wait_response;
+//            break;
+//            
+//        case wait_receive:
+//            break;
+//            
+//        case wait_response:
+//            break;
+//            
+//        case wait_final:
+//            break;
+//            
+//        case final:
+//            break;
+//            
+//        case stall:
+//            break;
+//    }
 
 //#ifdef IS_TAG
 //    switch(tag_state){
