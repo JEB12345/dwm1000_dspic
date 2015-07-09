@@ -110,23 +110,28 @@ tag_states tag_state = tag_init;
     uint64_t global_tag_anchor_resp_rx_time = 0;
 
 //    uint64_t global_tRP = 0;
-    uint64_t global_tRR = 0;
-    uint64_t global_tRP = 0;
-    uint64_t global_tSR = 0;
-    uint64_t global_tRF = 0;
-    uint64_t global_tSP = 0;
+    uint64_t global_tRR[NUM_TOTAL_NODES];
+    uint64_t global_tRP[NUM_TOTAL_NODES];
+    uint64_t global_tSR[NUM_TOTAL_NODES];
+    uint64_t global_tRF[NUM_TOTAL_NODES];
+    uint64_t global_tSP[NUM_TOTAL_NODES];
+//    memset(global_tRR, 0, sizeof(global_tRR));
+//    memset(global_tRP, 0, sizeof(global_tRP));
+//    memset(global_tSR, 0, sizeof(global_tSR));
+//    memset(global_tRF, 0, sizeof(global_tRF));
+//    memset(global_tSP, 0, sizeof(global_tSP));
     uint8_t global_recv_pkt[512];
 
     uint32_t global_subseq_num = 0x0;
     uint8_t global_chan = 1;
-    float global_distances[NUM_ANCHORS*NUM_ANTENNAS*NUM_ANTENNAS*NUM_CHANNELS];
+    float global_distances[NUM_TOTAL_NODES];
 
     struct ieee154_msg  {
         uint8_t frameCtrl[2];                             //  frame control bytes 00-01
         uint8_t seqNum;                                   //  sequence_number 02
         uint8_t panID[2];                                 //  PAN ID 03-04
-        uint8_t destAddr[8];
-        uint8_t sourceAddr[8];
+//        uint8_t destAddr;
+        uint8_t sourceAddr;
         uint8_t messageType; //   (application data and any user payload)
         uint8_t anchorID;
         uint8_t fcs[2] ;                                  //  we allow space for the CRC as it is logically part of the message. However ScenSor TX calculates and adds these bytes.
@@ -136,11 +141,11 @@ tag_states tag_state = tag_init;
         uint8_t frameCtrl[2];                             //  frame control bytes 00-01
         uint8_t seqNum;                                   //  sequence_number 02
         uint8_t panID[2];                                 //  PAN ID 03-04
-        uint8_t destAddr[2];
-        uint8_t sourceAddr[2];
+        uint8_t destAddr;
+        uint8_t sourceAddr;
         uint8_t messageType; //   (application data and any user payload)
         uint8_t anchorID;
-        float distanceHist[NUM_ANTENNAS*NUM_ANTENNAS*NUM_CHANNELS];
+        float distanceHist[NUM_TOTAL_NODES];
         uint8_t fcs[2] ;                                  //  we allow space for the CRC as it is logically part of the message. However ScenSor TX calculates and adds these bytes.
     } __attribute__ ((__packed__));
 
@@ -148,8 +153,8 @@ tag_states tag_state = tag_init;
         uint8_t frameCtrl[2];                             //  frame control bytes 00-01
         uint8_t seqNum;                                   //  sequence_number 02
         uint8_t panID[2];                                 //  PAN ID 03-04
-        uint8_t destAddr[2];
-        uint8_t sourceAddr[8];
+//        uint8_t destAddr;
+        uint8_t sourceAddr;
         uint8_t messageType; //   (application data and any user payload)
 //        uint32_t data[2];
         uint8_t tSP[5];
@@ -307,7 +312,7 @@ uint8_t dwm_init()
     msg.panID[0] = DW1000_PANID & 0xff;
     msg.panID[1] = DW1000_PANID >> 8;
     msg.seqNum = 0;
-    msg.anchorID = ANCHOR_EUI;
+    msg.anchorID = NODE_ID;
 
     // Setup the constants in the outgoing packet
     fin_msg.frameCtrl[0] = 0x41; // data frame, ack req, panid comp
@@ -315,7 +320,7 @@ uint8_t dwm_init()
     fin_msg.panID[0] = DW1000_PANID & 0xff;
     fin_msg.panID[1] = DW1000_PANID >> 8;
     fin_msg.seqNum = 0;
-    fin_msg.anchorID = ANCHOR_EUI;
+    fin_msg.anchorID = NODE_ID;
 
     // Setup the constants in the outgoing packet
     bcast_msg.frameCtrl[0] = 0x41; // data frame, ack req, panid comp
@@ -332,95 +337,72 @@ uint8_t dwm_init()
 
     
     
-    if (DW1000_ROLE_TYPE == ANCHOR) {
-	uint8_t eui_array[8];
+//    if (DW1000_ROLE_TYPE == ANCHOR) {
+    uint8_t eui_array[8];
 
-        // Enable frame filtering
-        dwt_enableframefilter(DWT_FF_DATA_EN | DWT_FF_ACK_EN);
+    // Enable frame filtering
+    dwt_enableframefilter(DWT_FF_DATA_EN | DWT_FF_ACK_EN);
 
-        dw1000_populate_eui(eui_array, ANCHOR_EUI);
-  	dwt_seteui(eui_array);
-        dwt_setpanid(DW1000_PANID);
+    dw1000_populate_eui(eui_array, NODE_ID);
+    dwt_seteui(eui_array);
+    dwt_setpanid(DW1000_PANID);
 
-        // Set more packet constants
-        dw1000_populate_eui(msg.sourceAddr, ANCHOR_EUI);
-        dw1000_populate_eui(fin_msg.sourceAddr, ANCHOR_EUI);
+    // Set more packet constants
+    msg.sourceAddr = NODE_ID;
+    fin_msg.sourceAddr = NODE_ID;
 
-        // hard code destination for now....
-        dw1000_populate_eui(msg.destAddr, TAG_EUI);
-        dw1000_populate_eui(fin_msg.destAddr, TAG_EUI);
+    // We do want to enable auto RX
+    dwt_setautorxreenable(1);
+    // Let's do double buffering
+    dwt_setdblrxbuffmode(0);
+    // Disable RX timeout by setting to 0
+    dwt_setrxtimeout(0);
 
-        // We do want to enable auto RX
-        dwt_setautorxreenable(1);
-        // Let's do double buffering
-        dwt_setdblrxbuffmode(0);
-        // Disable RX timeout by setting to 0
-        dwt_setrxtimeout(0);
+    // Try pre-populating this
+    msg.seqNum++;
+    msg.messageType = MSG_TYPE_ANC_RESP;
+    fin_msg.messageType = MSG_TYPE_ANC_FINAL;
 
-        // Try pre-populating this
-        msg.seqNum++;
-        msg.messageType = MSG_TYPE_ANC_RESP;
-        fin_msg.messageType = MSG_TYPE_ANC_FINAL;
+    //Reset all the distance measurements
+    memset(fin_msg.distanceHist, 0, sizeof(fin_msg.distanceHist));
 
-        // Go for receiving
-        dwt_rxenable(0);
+//    } else if (DW1000_ROLE_TYPE == TAG) {
+//    uint8_t eui_array[8];
 
-    } else if (DW1000_ROLE_TYPE == TAG) {
-	uint8_t eui_array[8];
+//        // Allow data and ack frames
+//        dwt_enableframefilter(DWT_FF_DATA_EN | DWT_FF_ACK_EN);
 
-        // First thing we do as a TAG is send the POLL message when the
-        // timer fires
-        // tag_state = TAG_SEND_POLL;
+//        dw1000_populate_eui(eui_array, TAG_EUI);
+//        dwt_seteui(eui_array);
+//        dwt_setpanid(DW1000_PANID);
 
-        // Allow data and ack frames
-        dwt_enableframefilter(DWT_FF_DATA_EN | DWT_FF_ACK_EN);
+    // Set more packet constants
+    bcast_msg.sourceAddr = NODE_ID;
 
-        dw1000_populate_eui(eui_array, TAG_EUI);
-  	dwt_seteui(eui_array);
-        dwt_setpanid(DW1000_PANID);
+//        // Do this for the tag too
+//        dwt_setautorxreenable(1);
+//        dwt_setdblrxbuffmode(0);
+//        dwt_enableautoack(5 /*ACK_RESPONSE_TIME*/);
 
-        // Set more packet constants
-        dw1000_populate_eui(bcast_msg.sourceAddr, TAG_EUI);
-	memset(bcast_msg.destAddr, 0xFF, 2);
-
-        // Do this for the tag too
-        dwt_setautorxreenable(1);
-        dwt_setdblrxbuffmode(0);
-        dwt_enableautoack(5 /*ACK_RESPONSE_TIME*/);
-
-        // Configure sleep
-        {
-            int mode = DWT_LOADUCODE    |
-                       DWT_PRESRV_SLEEP |
-                       DWT_CONFIG       |
-                       DWT_TANDV;
-            if (dwt_getldotune() != 0) {
-                // If we need to use LDO tune value from OTP kick it after sleep
-                mode |= DWT_LOADLDO;
-            }
-            // NOTE: on the EVK1000 the DEEPSLEEP is not actually putting the
-            // DW1000 into full DEEPSLEEP mode as XTAL is kept on
-            dwt_configuresleep(mode, DWT_WAKE_CS | DWT_SLP_EN);
-        }
-
+    // Configure sleep
+    int mode = DWT_LOADUCODE    |
+               DWT_PRESRV_SLEEP |
+               DWT_CONFIG       |
+               DWT_TANDV;
+    if (dwt_getldotune() != 0) {
+        // If we need to use LDO tune value from OTP kick it after sleep
+        mode |= DWT_LOADLDO;
     }
-    /*****https://github.com/lab11/polypoint******/
+    // NOTE: on the EVK1000 the DEEPSLEEP is not actually putting the
+    // DW1000 into full DEEPSLEEP mode as XTAL is kept on
+    dwt_configuresleep(mode, DWT_WAKE_CS | DWT_SLP_EN);
 
-//#if (DR_DISCOVERY == 0)
-//    addressconfigure() ;                            // set up initial payload configuration
-//#endif
-//    instancesettagsleepdelay(POLL_SLEEP_DELAY, BLINK_SLEEP_DELAY); //set the Tag sleep time
-//
-//    // NOTE: this is the delay between receiving the blink and sending the ranging init message
-//    // The anchor ranging init response delay has to match the delay the tag expects
-//    // the tag will then use the ranging response delay as specified in the ranging init message
-//    // use this to set the long blink response delay (e.g. when ranging with a PC anchor that wants to use the long response times != 150ms)
-//    instancesetblinkreplydelay(FIXED_REPLY_DELAY);
-////    instancesetblinkreplydelay(FIXED_LONG_BLINK_RESPONSE_DELAY);
-//
-//    //set the default response delays
-//    instancesetreplydelay(FIXED_REPLY_DELAY, 0);
+//    }
 
+    // Go for receiving
+    dwt_rxenable(0);
+    
+    // Turn status LEDs on DWM1000
     dwt_setleds(1);
 
     return result;
@@ -435,7 +417,7 @@ void app_dw1000_txcallback (const dwt_callback_data_t *txd) {
 void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
     int err;
 
-    if (DW1000_ROLE_TYPE == TAG) {
+//    if (DW1000_ROLE_TYPE == TAG) {
 
         // The tag receives one packet: "ANCHOR RESPONSE"
         // Make sure the packet is valid and matches an anchor response.
@@ -444,6 +426,11 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
         if (rxd->event == DWT_SIG_RX_OKAY) {
             struct ieee154_msg* msg_ptr;
             uint8_t packet_type_byte;
+            struct ieee154_bcast_msg* bmsg_ptr;
+            uint8_t packet_type_byte;
+            uint64_t rxtimestamp;
+            uint64_t systimestamp;
+            uint8_t subseq_num;
 
             // Get the timestamp first
             uint8_t txTimeStamp[5] = {0, 0, 0, 0, 0};
@@ -471,7 +458,6 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                 // 32 bits together and use that time because this chip is
                 // weird.
                 uint8_t anchor_id = msg_ptr->anchorID;
-                if(anchor_id >= NUM_ANCHORS) anchor_id = NUM_ANCHORS;
 
                 dwt_forcetrxoff();
                 uint16_t tx_frame_length = sizeof(bcast_msg);
@@ -516,22 +502,16 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                 int offset_idx = (final_msg_ptr->anchorID-1)*NUM_ANTENNAS*NUM_ANTENNAS*NUM_CHANNELS;
                 memcpy(&global_distances[offset_idx],final_msg_ptr->distanceHist,sizeof(fin_msg.distanceHist));
             }
-        } else if (rxd->event == DWT_SIG_RX_TIMEOUT) {
+//        } else if (rxd->event == DWT_SIG_RX_TIMEOUT) {
+//
+//        }
 
-        }
-
-    } else if (DW1000_ROLE_TYPE == ANCHOR) {
+//    } else if (DW1000_ROLE_TYPE == ANCHOR) {
 
         // The anchor should receive two packets: a POLL from a tag and
         // a FINAL from a tag.
 
-        if (rxd->event == DWT_SIG_RX_OKAY) {
-            struct ieee154_bcast_msg* msg_ptr;
-            uint8_t packet_type_byte;
-            uint64_t rxtimestamp;
-            uint64_t systimestamp;
-            uint8_t subseq_num;
-
+//        if (rxd->event == DWT_SIG_RX_OKAY) {
 
             // Get the timestamp first
             uint8_t txTimeStamp[5] = {0, 0, 0, 0, 0};
@@ -545,7 +525,7 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
             // tGet the packet
 //            dwt_readrxdata(&packet_type_byte, 1, 15);
             dwt_readrxdata(global_recv_pkt, rxd->datalength, 0);
-            msg_ptr = (struct ieee154_bcast_msg*) global_recv_pkt;
+            bmsg_ptr = (struct ieee154_bcast_msg*) global_recv_pkt;
             packet_type_byte = global_recv_pkt[offsetof(struct ieee154_bcast_msg, messageType)];
 
 
@@ -593,9 +573,6 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                 err = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
                 
                 dwt_settxantennadelay(global_tx_antenna_delay);
-
-                //Reset all the distance measurements
-                memset(fin_msg.distanceHist, 0, sizeof(fin_msg.distanceHist));
 
                 anchor_state = anchor_wait_final;
             } else if (packet_type_byte == MSG_TYPE_TAG_FINAL) {
@@ -655,7 +632,7 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                     //double range_bias = 0.0;//dwt_getrangebias(global_chan, (float) dist, DWT_PRF_64M);
 #ifndef DW_CAL_TRX_DELAY
                     dist += ANCHOR_CAL_LEN;
-                    dist -= txDelayCal[ANCHOR_EUI*NUM_CHANNELS + 1];
+                    dist -= txDelayCal[0]; //This can be used to calibrate the error based on different nodes... need to implement
 #endif
                     #ifdef DW_DEBUG
                         printf("dist*100 = %d\r\n", (int)(dist*100));
@@ -674,7 +651,7 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
         else{
             dwt_rxenable(0);
         }
-    }
+//    }
 }
 
 void send_poll(){
@@ -684,7 +661,6 @@ void send_poll(){
     
 	// Through tSP (tSF is field after) then +2 for FCS
     uint16_t tx_frame_length = sizeof(bcast_msg);
-	memset(bcast_msg.destAddr, 0xFF, 2);
 
 	bcast_msg.seqNum++;
 //	bcast_msg.subSeqNum = global_subseq_num;
@@ -709,12 +685,7 @@ void send_poll(){
                 (((uint64_t) TimeStamp[3]) << 24) +
                 (((uint64_t) TimeStamp[4]) << 32);
 
-//	uint32_t temp = dwt_readsystimestamphi32();
-	//uint32_t delay_time = temp + GLOBAL_PKT_DELAY_UPPER32;
-	//(APP_US_TO_DEVICETIMEU32(NODE_DELAY_US) & DELAY_MASK) >> 8
-//	uint32_t delay_time = temp + ((convertmicrosectodevicetimeu32(TAG_SEND_POLL_DELAY_US)>>8));
     uint32_t delay_time = (uint32_t)((systimestamp)>>8) + ((convertmicrosectodevicetimeu32(TAG_SEND_POLL_DELAY_US)>>8));
-	//uint32_t delay_time = dwt_readsystimestamphi32() + GLOBAL_PKT_DELAY_UPPER32;
 	delay_time &= 0xFFFFFFFE; //Make sure last bit is zero
 	dwt_setdelayedtrxtime(delay_time);
     uint64_t tSP_tmp = systimestamp + (convertmicrosectodevicetimeu(TAG_SEND_POLL_DELAY_US));
@@ -732,84 +703,84 @@ void send_poll(){
 }
 
 void instance_process(){
-
-#ifdef IS_TAG
-    switch(tag_state){
-        case tag_init:
-            tag_state = tag_poll;
+    
+    switch(multiBroadcast_states){
+        case init:
+            multiBroadcast_states = poll;
             break;
-
-        case tag_poll:
+            
+        case poll:
             stall_count = 0;
-            dwt_forcetrxoff();  // Force the tx or rx state off
+//            dwt_forcetrxoff();  // Force the tx or rx state off
             send_poll();
-            tag_state = tag_wait_response;
+            multiBroadcast_states = wait_response;
             break;
-
-        case tag_wait_response:
-            wait_count++;
-            if(wait_count > 200){
-                tag_state = tag_poll;
-                wait_count = 0;
-            }
+            
+        case wait_receive:
             break;
-
-        case tag_final:
-            wait_count = 0;
+            
+        case wait_response:
             break;
-
-        case tag_stall:
-            stall_count++;
-            if(stall_count > 50){
-                tag_state = tag_poll;
-                stall_count = 0;
-            }
+            
+        case wait_final:
+            break;
+            
+        case final:
+            break;
+            
+        case stall:
             break;
     }
-#endif
-#ifdef IS_ANCHOR
-    switch(anchor_state){
-        case anchor_init:
-            anchor_state = anchor_wait_receive;
-            break;
 
-        case anchor_wait_receive:
-            // Waiting for poll message
-            break;
-
-        case anchor_wait_final:
-            // Waiting for final message
-            break;
-    }
-#endif
-//    incr_subsequence_counter();
-//    if(DW1000_ROLE_TYPE == TAG){
-//        if(global_subseq_num < NUM_ANTENNAS*NUM_ANTENNAS*NUM_CHANNELS){
-//            //Make sure we're out of rx mode before attempting to transmit
-//            dwt_forcetrxoff();
+//#ifdef IS_TAG
+//    switch(tag_state){
+//        case tag_init:
+//            tag_state = tag_poll;
+//            break;
 //
+//        case tag_poll:
+//            stall_count = 0;
+//            dwt_forcetrxoff();  // Force the tx or rx state off
 //            send_poll();
-//        } else if(global_subseq_num == NUM_ANTENNAS*NUM_ANTENNAS*NUM_CHANNELS){
-//            dwt_rxenable(0);
-//            dwt_setrxtimeout(0); // disable timeout
-//        }
-//    } else {
-//        //If it's after the last ranging operation, queue outgoing range estimates
-//        if(global_subseq_num == NUM_ANTENNAS*NUM_ANTENNAS*NUM_CHANNELS){
-//            //We're likely in RX mode, so we need to exit before transmission
-//            dwt_forcetrxoff();
+//            tag_state = tag_wait_response;
+//            break;
 //
-//            //Schedule this transmission for our scheduled time slot
-//            uint32_t delay_time = dwt_readsystimestamphi32() + global_pkt_delay_upper32*(NUM_ANCHORS-ANCHOR_EUI+1)*2;
-//            delay_time &= 0xFFFFFFFE;
-//            dwt_setdelayedtrxtime(delay_time);
-//            dwt_writetxfctrl(sizeof(fin_msg), 0);
-//            dwt_writetxdata(sizeof(fin_msg), (uint8_t*) &fin_msg, 0);
-//            dwt_starttx(DWT_START_TX_DELAYED);
-//            dwt_settxantennadelay(global_tx_antenna_delay);
-//            incr_subsequence_counter();
-//        }
+//        case tag_wait_response:
+//            wait_count++;
+//            if(wait_count > 200){
+//                tag_state = tag_poll;
+//                wait_count = 0;
+//            }
+//            break;
+//
+//        case tag_final:
+//            wait_count = 0;
+//            break;
+//
+//        case tag_stall:
+//            stall_count++;
+//            if(stall_count > 50){
+//                tag_state = tag_poll;
+//                stall_count = 0;
+//            }
+//            break;
 //    }
+//#endif
+//#ifdef IS_ANCHOR
+//    switch(anchor_state){
+//        case anchor_init:
+//            anchor_state = anchor_wait_receive;
+//            break;
+//
+//        case anchor_wait_receive:
+//            // Waiting for poll message
+//            break;
+//
+//        case anchor_wait_final:
+//            // Waiting for final message
+//            break;
+//    }
+//#endif
 }
 
 void incr_subsequence_counter(){
