@@ -14,14 +14,16 @@
 #include "../sensor_spi2.h"
 #include "../sensor_pindefs.h"
 
-extern dwm_1000_status dwm_status;
+
+
+
 
 #define DWM_RESET_ON DWM_RESET_TRIS = 0; DWM_RESET_OUT = 0
 #define DWM_RESET_OFF DWM_RESET_TRIS = 1
 
 #define TAG_SEND_POLL_DELAY_US 400
 #define TAG_SEND_FINAL_DELAY_US 400
-#define ANC_RESP_DELAY 200
+#define ANC_RESP_DELAY 400
 #define TX_ANTENNA_DELAY 0
 
 #define TWOPOWER40 1099511627776L // decimal value of 2^40 to correct timeroverflow between timestamps
@@ -92,11 +94,32 @@ typedef struct
     uint16_t sfdTO ;
 } chConfig_t ;
 
+enum dwm_tx_state {
+        DWM_SEND_POLL,
+        DWM_SEND_RESPONSE,
+        DWM_SEND_FINAL,
+        DWM_COMPUTE_TOF
+    } ;
+
+    typedef struct {
+        uint8_t     irq_enable;
+        double       distance[NUM_TOTAL_NODES]; //current distance measurement
+        void (*timer_func)(uint16_t microseconds,void (*cb)());
+        volatile unsigned timer_interrupt;
+        enum dwm_tx_state   tx_state;
+        uint8_t node_id;
+    } dwm_1000_status;
+
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-    uint8_t dwm_init();
+    uint8_t dwm_init(uint8_t node_id, void (*timer_func)(uint16_t microseconds,void (*cb)()));
+    
+    /**
+     * Call this function when dwm_status.timer_interrupt = 1
+     */
+    void dwt_timer_interrupt();
 
     /**
      * This function takes the information provided by the decaWave DWM1000 API
