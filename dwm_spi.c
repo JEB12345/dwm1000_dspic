@@ -105,33 +105,28 @@ tag_states tag_state = tag_init;
 
     uint32_t global_pkt_delay_upper32 = 0;
 
-    uint64_t global_tag_poll_tx_time = 0;
+   // uint64_t global_tag_poll_tx_time = 0;
 //    uint64_t global_tag_anchor_resp_rx_time = 0;
-    uint64_t global_tag_anchor_resp_rx_time = 0;
-
-//    uint64_t global_tRP = 0;
+    
+    uint64_t global_tag_anchor_resp_rx_time[NUM_TOTAL_NODES];
     uint64_t global_tRR[NUM_TOTAL_NODES];
     uint64_t global_tRP[NUM_TOTAL_NODES];
-    uint64_t global_tSR[NUM_TOTAL_NODES];
+    uint64_t global_tSR = 0;
     uint64_t global_tRF[NUM_TOTAL_NODES];
     uint64_t global_tSP[NUM_TOTAL_NODES];
-//    memset(global_tRR, 0, sizeof(global_tRR));
-//    memset(global_tRP, 0, sizeof(global_tRP));
-//    memset(global_tSR, 0, sizeof(global_tSR));
-//    memset(global_tRF, 0, sizeof(global_tRF));
-//    memset(global_tSP, 0, sizeof(global_tSP));
+    uint64_t global_tSF[NUM_TOTAL_NODES];
     uint8_t global_recv_pkt[512];
 
     uint32_t global_subseq_num = 0x0;
     uint8_t global_chan = 1;
-    float global_distances[NUM_TOTAL_NODES];
+    float global_distances[NUM_ANCHORS*NUM_ANTENNAS*NUM_ANTENNAS*NUM_CHANNELS];
 
     struct ieee154_msg  {
         uint8_t frameCtrl[2];                             //  frame control bytes 00-01
         uint8_t seqNum;                                   //  sequence_number 02
         uint8_t panID[2];                                 //  PAN ID 03-04
-//        uint8_t destAddr;
-        uint8_t sourceAddr;
+        uint8_t destAddr[8];
+        uint8_t sourceAddr[8];
         uint8_t messageType; //   (application data and any user payload)
         uint8_t anchorID;
         uint8_t fcs[2] ;                                  //  we allow space for the CRC as it is logically part of the message. However ScenSor TX calculates and adds these bytes.
@@ -141,11 +136,11 @@ tag_states tag_state = tag_init;
         uint8_t frameCtrl[2];                             //  frame control bytes 00-01
         uint8_t seqNum;                                   //  sequence_number 02
         uint8_t panID[2];                                 //  PAN ID 03-04
-        uint8_t destAddr;
-        uint8_t sourceAddr;
+        uint8_t destAddr[2];
+        uint8_t sourceAddr[2];
         uint8_t messageType; //   (application data and any user payload)
         uint8_t anchorID;
-        float distanceHist[NUM_TOTAL_NODES];
+        float distanceHist[NUM_ANTENNAS*NUM_ANTENNAS*NUM_CHANNELS];
         uint8_t fcs[2] ;                                  //  we allow space for the CRC as it is logically part of the message. However ScenSor TX calculates and adds these bytes.
     } __attribute__ ((__packed__));
 
@@ -153,7 +148,7 @@ tag_states tag_state = tag_init;
         uint8_t frameCtrl[2];                             //  frame control bytes 00-01
         uint8_t seqNum;                                   //  sequence_number 02
         uint8_t panID[2];                                 //  PAN ID 03-04
-//        uint8_t destAddr;
+        uint8_t destAddr[2];
         uint8_t sourceAddr;
         uint8_t messageType; //   (application data and any user payload)
 //        uint32_t data[2];
@@ -163,21 +158,10 @@ tag_states tag_state = tag_init;
         //uint64_t tRR[NUM_ANCHORS]; // time differences
         uint8_t fcs[2] ;                                  //  we allow space for the CRC as it is logically part of the message. However ScenSor TX calculates and adds these bytes.
     } __attribute__ ((__packed__));
-    
-    struct ieee154_test_msg  {
-        uint8_t frameCtrl[2];                             //  frame control bytes 00-01
-        uint8_t seqNum;                                   //  sequence_number 02
-        uint8_t panID[2];                                 //  PAN ID 03-04
-        uint8_t sourceAddr;
-        uint8_t messageType; //   (application data and any user payload)
-        uint8_t value;
-        uint8_t fcs[2] ;                                  //  we allow space for the CRC as it is logically part of the message. However ScenSor TX calculates and adds these bytes.
-    } __attribute__ ((__packed__));
 
     struct ieee154_msg msg;
     struct ieee154_final_msg fin_msg;
     struct ieee154_bcast_msg bcast_msg;
-    struct ieee154_test_msg test_msg;
     
 //    void to_lower_40bits(uint8_t* out, uint64_t in){//too slow!
 //        unsigned i;
@@ -212,11 +196,16 @@ void dwm_reset()
     DWM_RESET_OFF;
 }
 
-uint8_t dwm_init()
+uint8_t dwm_init(uint8_t node_id, void (*timer_func)(uint16_t microseconds,void (*cb)()))
 {
     uint8_t result = 1;
     uint32_t devID ;
 
+    dwm_status.timer_func = timer_func;
+    dwm_status.timer_interrupt = 0; 
+    dwm_status.tx_state = DWM_SEND_POLL;
+    dwm_status.node_id = node_id;
+    
     dwm_reset();
 
     while(DWM_RESET_IN != 1);
@@ -323,7 +312,7 @@ uint8_t dwm_init()
     msg.panID[0] = DW1000_PANID & 0xff;
     msg.panID[1] = DW1000_PANID >> 8;
     msg.seqNum = 0;
-    msg.anchorID = NODE_ID;
+    msg.anchorID = ANCHOR_EUI;
 
     // Setup the constants in the outgoing packet
     fin_msg.frameCtrl[0] = 0x41; // data frame, ack req, panid comp
@@ -331,7 +320,7 @@ uint8_t dwm_init()
     fin_msg.panID[0] = DW1000_PANID & 0xff;
     fin_msg.panID[1] = DW1000_PANID >> 8;
     fin_msg.seqNum = 0;
-    fin_msg.anchorID = NODE_ID;
+    fin_msg.anchorID = ANCHOR_EUI;
 
     // Setup the constants in the outgoing packet
     bcast_msg.frameCtrl[0] = 0x41; // data frame, ack req, panid comp
@@ -340,12 +329,6 @@ uint8_t dwm_init()
     bcast_msg.panID[1] = DW1000_PANID >> 8;
     bcast_msg.seqNum = 0;
 //    bcast_msg.subSeqNum = 0;
-    
-    test_msg.frameCtrl[0] = 0x41; // data frame, ack req, panid comp
-    test_msg.frameCtrl[1] = 0xC8; // ext addr
-    test_msg.panID[0] = DW1000_PANID & 0xff;
-    test_msg.panID[1] = DW1000_PANID >> 8;
-    test_msg.seqNum = 0;
 
     // Calculate the delay between packet reception and transmission.
     // This applies to the time between POLL and RESPONSE (on the anchor side)
@@ -354,147 +337,158 @@ uint8_t dwm_init()
 
     
     
-//    if (DW1000_ROLE_TYPE == ANCHOR) {
-    uint8_t eui_array[8];
+    if (DW1000_ROLE_TYPE == ANCHOR) {
+	uint8_t eui_array[8];
 
-    // Enable frame filtering
-    dwt_enableframefilter(DWT_FF_DATA_EN | DWT_FF_ACK_EN);
+        // Enable frame filtering
+        dwt_enableframefilter(DWT_FF_DATA_EN | DWT_FF_ACK_EN);
 
-    dw1000_populate_eui(eui_array, NODE_ID);
-    dwt_seteui(eui_array);
-    dwt_setpanid(DW1000_PANID);
+        dw1000_populate_eui(eui_array, ANCHOR_EUI);
+  	dwt_seteui(eui_array);
+        dwt_setpanid(DW1000_PANID);
 
-    // Set more packet constants
-    msg.sourceAddr = NODE_ID;
-    fin_msg.sourceAddr = NODE_ID;
+        // Set more packet constants
+        dw1000_populate_eui(msg.sourceAddr, ANCHOR_EUI);
+        dw1000_populate_eui(fin_msg.sourceAddr, ANCHOR_EUI);
 
-    // We do want to enable auto RX
-    dwt_setautorxreenable(1);
-    // Let's do double buffering
-    dwt_setdblrxbuffmode(0);
-    // Disable RX timeout by setting to 0
-    dwt_setrxtimeout(0);
+        // hard code destination for now....
+        dw1000_populate_eui(msg.destAddr, TAG_EUI);
+        dw1000_populate_eui(fin_msg.destAddr, TAG_EUI);
 
-    // Try pre-populating this
-    msg.seqNum++;
-    msg.messageType = MSG_TYPE_ANC_RESP;
-    fin_msg.messageType = MSG_TYPE_ANC_FINAL;
+        // We do want to enable auto RX
+        dwt_setautorxreenable(1);
+        // Let's do double buffering
+        dwt_setdblrxbuffmode(0);
+        // Disable RX timeout by setting to 0
+        dwt_setrxtimeout(0);
 
-    //Reset all the distance measurements
-    memset(fin_msg.distanceHist, 0, sizeof(fin_msg.distanceHist));
+        // Try pre-populating this
+        msg.seqNum++;
+        msg.messageType = MSG_TYPE_ANC_RESP;
+        fin_msg.messageType = MSG_TYPE_ANC_FINAL;
 
-//    } else if (DW1000_ROLE_TYPE == TAG) {
-//    uint8_t eui_array[8];
+        // Go for receiving
+        dwt_rxenable(0);
 
-//        // Allow data and ack frames
-//        dwt_enableframefilter(DWT_FF_DATA_EN | DWT_FF_ACK_EN);
+    } else if (DW1000_ROLE_TYPE == TAG) {
+	uint8_t eui_array[8];
 
-//        dw1000_populate_eui(eui_array, TAG_EUI);
-//        dwt_seteui(eui_array);
-//        dwt_setpanid(DW1000_PANID);
+        // First thing we do as a TAG is send the POLL message when the
+        // timer fires
+        // tag_state = TAG_SEND_POLL;
 
-    // Set more packet constants
-    bcast_msg.sourceAddr = NODE_ID;
+        // Allow data and ack frames
+        dwt_enableframefilter(DWT_FF_DATA_EN | DWT_FF_ACK_EN);
 
-//        // Do this for the tag too
-//        dwt_setautorxreenable(1);
-//        dwt_setdblrxbuffmode(0);
-//        dwt_enableautoack(5 /*ACK_RESPONSE_TIME*/);
+        dw1000_populate_eui(eui_array, TAG_EUI);
+  	dwt_seteui(eui_array);
+        dwt_setpanid(DW1000_PANID);
 
-    // Configure sleep
-    int mode = DWT_LOADUCODE    |
-               DWT_PRESRV_SLEEP |
-               DWT_CONFIG       |
-               DWT_TANDV;
-    if (dwt_getldotune() != 0) {
-        // If we need to use LDO tune value from OTP kick it after sleep
-        mode |= DWT_LOADLDO;
+        // Set more packet constants
+        //dw1000_populate_eui(bcast_msg.sourceAddr, TAG_EUI);
+	memset(bcast_msg.destAddr, 0xFF, 2);
+
+        // Do this for the tag too
+        dwt_setautorxreenable(1);
+        dwt_setdblrxbuffmode(0);
+        dwt_enableautoack(5 /*ACK_RESPONSE_TIME*/);
+
+        // Configure sleep
+        {
+            int mode = DWT_LOADUCODE    |
+                       DWT_PRESRV_SLEEP |
+                       DWT_CONFIG       |
+                       DWT_TANDV;
+            if (dwt_getldotune() != 0) {
+                // If we need to use LDO tune value from OTP kick it after sleep
+                mode |= DWT_LOADLDO;
+            }
+            // NOTE: on the EVK1000 the DEEPSLEEP is not actually putting the
+            // DW1000 into full DEEPSLEEP mode as XTAL is kept on
+            dwt_configuresleep(mode, DWT_WAKE_CS | DWT_SLP_EN);
+        }
+
     }
-    // NOTE: on the EVK1000 the DEEPSLEEP is not actually putting the
-    // DW1000 into full DEEPSLEEP mode as XTAL is kept on
-    dwt_configuresleep(mode, DWT_WAKE_CS | DWT_SLP_EN);
+    /*****https://github.com/lab11/polypoint******/
 
-//    }
+//#if (DR_DISCOVERY == 0)
+//    addressconfigure() ;                            // set up initial payload configuration
+//#endif
+//    instancesettagsleepdelay(POLL_SLEEP_DELAY, BLINK_SLEEP_DELAY); //set the Tag sleep time
+//
+//    // NOTE: this is the delay between receiving the blink and sending the ranging init message
+//    // The anchor ranging init response delay has to match the delay the tag expects
+//    // the tag will then use the ranging response delay as specified in the ranging init message
+//    // use this to set the long blink response delay (e.g. when ranging with a PC anchor that wants to use the long response times != 150ms)
+//    instancesetblinkreplydelay(FIXED_REPLY_DELAY);
+////    instancesetblinkreplydelay(FIXED_LONG_BLINK_RESPONSE_DELAY);
+//
+//    //set the default response delays
+//    instancesetreplydelay(FIXED_REPLY_DELAY, 0);
 
-    // Go for receiving
-    dwt_rxenable(0);
-    
-    // Turn status LEDs on DWM1000
     dwt_setleds(1);
 
     return result;
 }
-
+unsigned delayed_tx = 0;
 // Triggered after a TX
 void app_dw1000_txcallback (const dwt_callback_data_t *txd) {
     //NOTE: No need for tx timestamping after-the-fact (everything's done beforehand)
-    
+}
+
+void dwt_timer_cb(){
+    dwm_status.timer_interrupt = 1;
 }
 
 // Triggered when we receive a packet
 void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
     int err;
-    static unsigned delayed_tx = 0;
+    uint8_t rxtimestamp[5];
+    
     if (rxd->event == DWT_SIG_RX_OKAY) {
         dwt_readrxdata(global_recv_pkt, rxd->datalength, 0);
-    
-#ifdef IS_TAG
-        //just read packet, but ignore
-        //sending data in main loop
-        struct ieee154_test_msg* msg_ptr;
-        msg_ptr = (struct ieee154_test_msg*) global_recv_pkt;
-        if(msg_ptr->value==2){
-            //ignore
-        }
-#else
-        //convert to test_msg
-        struct ieee154_test_msg* msg_ptr;
-        msg_ptr = (struct ieee154_test_msg*) global_recv_pkt;
-        if(msg_ptr->value==1){
-            //do a delayed transmit            
-            dwt_forcetrxoff();
-            uint16_t tx_frame_length = sizeof (test_msg);
-            // Put at beginning of TX fifo
-            dwt_writetxfctrl(tx_frame_length, 0);
-            dwt_setrxtimeout(0);
-            uint8_t TimeStamp[5] = {0, 0, 0, 0, 0};
-            dwt_readsystime(TimeStamp);
-            uint64_t systimestamp = from_lower_40_bits(TimeStamp);
-            uint32_t delay_time = (uint32_t) ((systimestamp) >> 8) + ((convertmicrosectodevicetimeu32(10000) >> 8));
-            delay_time &= 0xFFFFFFFE;
-            dwt_setdelayedtrxtime(delay_time);
-            // Need to actually fill out the packet
-            test_msg.value = 2;
-            dwt_writetxdata(tx_frame_length, (uint8_t*) & test_msg, 0);
-            err = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
-            dwt_settxantennadelay(global_tx_antenna_delay);
-            delayed_tx = 1;
-        } else {
-            //check if we're in a delayed transmit state?
-            if(delayed_tx){
-                delayed_tx = 0;
+        //Assume everything is a bcast msg for now
+        struct ieee154_bcast_msg* msg_ptr;
+        msg_ptr = (struct ieee154_bcast_msg*) global_recv_pkt;
+        
+        dwt_readrxtimestamp(rxtimestamp);
+        if(msg_ptr->messageType == DWM_SEND_POLL){
+            if(msg_ptr->sourceAddr==0){ //received poll from first node: start of new sequence
+                //reset state
+                memset(global_tag_anchor_resp_rx_time,0xFA,sizeof(global_tag_anchor_resp_rx_time));
+                memset(global_tRR,0xFA,sizeof(global_tRR));
+                memset(global_tRP,0xFA,sizeof(global_tRP));
+                memset(global_tRF,0xFA,sizeof(global_tRF));
+                memset(global_tSP,0xFA,sizeof(global_tSP));
+                memset(global_tSF,0xFA,sizeof(global_tSF));
+                //start transmit sequence
+                dwm_status.tx_state = DWM_SEND_POLL;
+                dwm_status.timer_func(dwm_status.node_id*2000,dwt_timer_cb);
             }
+            //store information contained in and related to poll message            
+            global_tRP[msg_ptr->sourceAddr] = from_lower_40_bits(rxtimestamp);
+            global_tSP[msg_ptr->sourceAddr] = from_lower_40_bits(&global_recv_pkt[offsetof(struct ieee154_bcast_msg, tSP)]);
+        } else if (msg_ptr->messageType == DWM_SEND_RESPONSE){
+            //store information contained in and related to response message
+            dwt_readrxtimestamp(rxtimestamp);
+            global_tag_anchor_resp_rx_time[msg_ptr->sourceAddr] = from_lower_40_bits(rxtimestamp);
+        } else if (msg_ptr->messageType == DWM_SEND_FINAL) {
+            //store information contained in and related to final message
+            global_tRF[msg_ptr->sourceAddr] = from_lower_40_bits(rxtimestamp);
+            global_tRR[msg_ptr->sourceAddr] = from_lower_40_bits(msg_ptr->tRR[dwm_status.node_id]); //note: own id as we're reading "our" reception time on a remote node
+            global_tSF[msg_ptr->sourceAddr] = from_lower_40_bits(msg_ptr->tSF);
+            //TODO: trigger a TOF calculation when everything has been received
         }
-#endif
+        //TODO: handle incoming packets
+        
+        dwt_forcetrxoff();        
+        dwt_setrxtimeout(0); //TODO: not sure if needed
+        dwt_rxenable(0);
+
     }
-    
-//    //Here's the plan
-//    if(poll && poll.sender==0){
-//        //send delayed poll
-//        //send delayed response
-//        //send delayed final message
-//    } else if(poll){
-//        //store timing  info from "tag"
-//    } else if(response){
-//        //record tRR & tSF
-//    } else if(final){
-//        //compute result
-//    }
-    
-    
-    
-    
-////    if (DW1000_ROLE_TYPE == TAG) {
+//    int err;
+//
+//    if (DW1000_ROLE_TYPE == TAG) {
 //
 //        // The tag receives one packet: "ANCHOR RESPONSE"
 //        // Make sure the packet is valid and matches an anchor response.
@@ -503,11 +497,6 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
 //        if (rxd->event == DWT_SIG_RX_OKAY) {
 //            struct ieee154_msg* msg_ptr;
 //            uint8_t packet_type_byte;
-//            struct ieee154_bcast_msg* bmsg_ptr;
-//            //uint8_t packet_type_byte;
-//            uint64_t rxtimestamp;
-//            uint64_t systimestamp;
-//            uint8_t subseq_num;
 //
 //            // Get the timestamp first
 //            uint8_t txTimeStamp[5] = {0, 0, 0, 0, 0};
@@ -535,6 +524,7 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
 //                // 32 bits together and use that time because this chip is
 //                // weird.
 //                uint8_t anchor_id = msg_ptr->anchorID;
+//                if(anchor_id >= NUM_ANCHORS) anchor_id = NUM_ANCHORS;
 //
 //                dwt_forcetrxoff();
 //                uint16_t tx_frame_length = sizeof(bcast_msg);
@@ -579,16 +569,22 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
 //                int offset_idx = (final_msg_ptr->anchorID-1)*NUM_ANTENNAS*NUM_ANTENNAS*NUM_CHANNELS;
 //                memcpy(&global_distances[offset_idx],final_msg_ptr->distanceHist,sizeof(fin_msg.distanceHist));
 //            }
-////        } else if (rxd->event == DWT_SIG_RX_TIMEOUT) {
-////
-////        }
+//        } else if (rxd->event == DWT_SIG_RX_TIMEOUT) {
 //
-////    } else if (DW1000_ROLE_TYPE == ANCHOR) {
+//        }
+//
+//    } else if (DW1000_ROLE_TYPE == ANCHOR) {
 //
 //        // The anchor should receive two packets: a POLL from a tag and
 //        // a FINAL from a tag.
 //
-////        if (rxd->event == DWT_SIG_RX_OKAY) {
+//        if (rxd->event == DWT_SIG_RX_OKAY) {
+//            struct ieee154_bcast_msg* msg_ptr;
+//            uint8_t packet_type_byte;
+//            uint64_t rxtimestamp;
+//            uint64_t systimestamp;
+//            uint8_t subseq_num;
+//
 //
 //            // Get the timestamp first
 //            uint8_t txTimeStamp[5] = {0, 0, 0, 0, 0};
@@ -602,7 +598,7 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
 //            // tGet the packet
 ////            dwt_readrxdata(&packet_type_byte, 1, 15);
 //            dwt_readrxdata(global_recv_pkt, rxd->datalength, 0);
-//            bmsg_ptr = (struct ieee154_bcast_msg*) global_recv_pkt;
+//            msg_ptr = (struct ieee154_bcast_msg*) global_recv_pkt;
 //            packet_type_byte = global_recv_pkt[offsetof(struct ieee154_bcast_msg, messageType)];
 //
 //
@@ -650,6 +646,9 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
 //                err = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
 //                
 //                dwt_settxantennadelay(global_tx_antenna_delay);
+//
+//                //Reset all the distance measurements
+//                memset(fin_msg.distanceHist, 0, sizeof(fin_msg.distanceHist));
 //
 //                anchor_state = anchor_wait_final;
 //            } else if (packet_type_byte == MSG_TYPE_TAG_FINAL) {
@@ -709,7 +708,7 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
 //                    //double range_bias = 0.0;//dwt_getrangebias(global_chan, (float) dist, DWT_PRF_64M);
 //#ifndef DW_CAL_TRX_DELAY
 //                    dist += ANCHOR_CAL_LEN;
-//                    dist -= txDelayCal[0]; //This can be used to calibrate the error based on different nodes... need to implement
+//                    dist -= txDelayCal[ANCHOR_EUI*NUM_CHANNELS + 1];
 //#endif
 //                    #ifdef DW_DEBUG
 //                        printf("dist*100 = %d\r\n", (int)(dist*100));
@@ -728,7 +727,7 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
 //        else{
 //            dwt_rxenable(0);
 //        }
-////    }
+//    }
 }
 
 void send_poll(){
@@ -738,12 +737,15 @@ void send_poll(){
     
 	// Through tSP (tSF is field after) then +2 for FCS
     uint16_t tx_frame_length = sizeof(bcast_msg);
+	memset(bcast_msg.destAddr, 0xFF, 2);
 
 	bcast_msg.seqNum++;
 //	bcast_msg.subSeqNum = global_subseq_num;
 
 	// First byte identifies this as a POLL
-	bcast_msg.messageType = MSG_TYPE_TAG_POLL;
+	bcast_msg.messageType = DWM_SEND_POLL;//MSG_TYPE_TAG_POLL;
+    
+    bcast_msg.sourceAddr = dwm_status.node_id;
 
 	// Tell the DW1000 about the packet
 	dwt_writetxfctrl(tx_frame_length, 0);
@@ -756,13 +758,14 @@ void send_poll(){
     
     uint8_t TimeStamp[5] = {0, 0, 0, 0, 0};
     dwt_readsystime(TimeStamp);
-    uint64_t systimestamp = (uint64_t) TimeStamp[0] +
-                (((uint64_t) TimeStamp[1]) << 8) +
-                (((uint64_t) TimeStamp[2]) << 16) +
-                (((uint64_t) TimeStamp[3]) << 24) +
-                (((uint64_t) TimeStamp[4]) << 32);
+    uint64_t systimestamp = from_lower_40_bits(TimeStamp);
 
+//	uint32_t temp = dwt_readsystimestamphi32();
+	//uint32_t delay_time = temp + GLOBAL_PKT_DELAY_UPPER32;
+	//(APP_US_TO_DEVICETIMEU32(NODE_DELAY_US) & DELAY_MASK) >> 8
+//	uint32_t delay_time = temp + ((convertmicrosectodevicetimeu32(TAG_SEND_POLL_DELAY_US)>>8));
     uint32_t delay_time = (uint32_t)((systimestamp)>>8) + ((convertmicrosectodevicetimeu32(TAG_SEND_POLL_DELAY_US)>>8));
+	//uint32_t delay_time = dwt_readsystimestamphi32() + GLOBAL_PKT_DELAY_UPPER32;
 	delay_time &= 0xFFFFFFFE; //Make sure last bit is zero
 	dwt_setdelayedtrxtime(delay_time);
     uint64_t tSP_tmp = systimestamp + (convertmicrosectodevicetimeu(TAG_SEND_POLL_DELAY_US));
@@ -779,114 +782,135 @@ void send_poll(){
 	dwt_settxantennadelay(TX_ANTENNA_DELAY);
 }
 
-void instance_process(){
-#ifdef IS_TAG
-    static unsigned ctr = 0;
-    if(ctr%5==0){
-    //send packet
-    dwt_forcetrxoff();
-    uint16_t tx_frame_length = sizeof (test_msg);
-    // Put at beginning of TX fifo
-    dwt_writetxfctrl(tx_frame_length, 0);
-    dwt_setrxtimeout(0);
+void send_response(){
+    //Reset all the tRRs at the beginning of each poll event
+	memset(bcast_msg.tRR, 0, sizeof(bcast_msg.tRR));//TODO: hacked
+    //bcast_msg.tRR = 0;//_H = bcast_msg.tRR_L = 0;
+    
+	// Through tSP (tSF is field after) then +2 for FCS
+    uint16_t tx_frame_length = sizeof(bcast_msg);
+	memset(bcast_msg.destAddr, 0xFF, 2);
+
+	bcast_msg.seqNum++;
+//	bcast_msg.subSeqNum = global_subseq_num;
+
+	// First byte identifies this as a POLL
+	bcast_msg.messageType = DWM_SEND_RESPONSE;//MSG_TYPE_TAG_POLL;
+    
+    bcast_msg.sourceAddr = dwm_status.node_id;
+
+	// Tell the DW1000 about the packet
+	dwt_writetxfctrl(tx_frame_length, 0);
+
+	// We'll get multiple responses, so let them all come in
+	dwt_setrxtimeout(0);
+
+	// Delay RX?
+//	dwt_setrxaftertxdelay(1); // us
+    
     uint8_t TimeStamp[5] = {0, 0, 0, 0, 0};
     dwt_readsystime(TimeStamp);
     uint64_t systimestamp = from_lower_40_bits(TimeStamp);
-    uint32_t delay_time = (uint32_t) ((systimestamp) >> 8) + ((convertmicrosectodevicetimeu32(400) >> 8));
-    delay_time &= 0xFFFFFFFE;
-    dwt_setdelayedtrxtime(delay_time);
-    // Need to actually fill out the packet
-    if(ctr==0){
-        test_msg.value = 1;
-    } else {
-        test_msg.value = 0;
+
+//	uint32_t temp = dwt_readsystimestamphi32();
+	//uint32_t delay_time = temp + GLOBAL_PKT_DELAY_UPPER32;
+	//(APP_US_TO_DEVICETIMEU32(NODE_DELAY_US) & DELAY_MASK) >> 8
+//	uint32_t delay_time = temp + ((convertmicrosectodevicetimeu32(TAG_SEND_POLL_DELAY_US)>>8));
+    uint32_t delay_time = (uint32_t)((systimestamp)>>8) + ((convertmicrosectodevicetimeu32(ANC_RESP_DELAY)>>8));
+	//uint32_t delay_time = dwt_readsystimestamphi32() + GLOBAL_PKT_DELAY_UPPER32;
+	delay_time &= 0xFFFFFFFE; //Make sure last bit is zero
+	dwt_setdelayedtrxtime(delay_time);
+    uint64_t tSR_tmp = systimestamp + (convertmicrosectodevicetimeu(ANC_RESP_DELAY));
+    global_tSR = tSR_tmp;
+	
+	// Write the data
+	dwt_writetxdata(tx_frame_length, (uint8_t*) &bcast_msg, 0);
+
+	// Start the transmission
+	dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
+
+	// MP bug - TX antenna delay needs reprogramming as it is
+	// not preserved
+	dwt_settxantennadelay(TX_ANTENNA_DELAY);
+}
+
+void send_final(){
+    //Reset all the tRRs at the beginning of each poll event
+	memset(bcast_msg.tRR, 0, sizeof(bcast_msg.tRR));//TODO: hacked
+    //bcast_msg.tRR = 0;//_H = bcast_msg.tRR_L = 0;
+    
+	// Through tSP (tSF is field after) then +2 for FCS
+    uint16_t tx_frame_length = sizeof(bcast_msg);
+	memset(bcast_msg.destAddr, 0xFF, 2);
+
+	bcast_msg.seqNum++;
+//	bcast_msg.subSeqNum = global_subseq_num;
+
+	// First byte identifies this as a POLL
+	bcast_msg.messageType = DWM_SEND_FINAL;//MSG_TYPE_TAG_POLL;
+    
+    bcast_msg.sourceAddr = dwm_status.node_id;
+
+	// Tell the DW1000 about the packet
+	dwt_writetxfctrl(tx_frame_length, 0);
+
+	// We'll get multiple responses, so let them all come in
+	dwt_setrxtimeout(0);
+
+	// Delay RX?
+//	dwt_setrxaftertxdelay(1); // us
+    
+    uint8_t TimeStamp[5] = {0, 0, 0, 0, 0};
+    dwt_readsystime(TimeStamp);
+    uint64_t systimestamp = from_lower_40_bits(TimeStamp);
+
+    unsigned i;
+    for(i=0;i<NUM_TOTAL_NODES;++i){
+        to_lower_40bits(bcast_msg.tRR[i], global_tag_anchor_resp_rx_time[i]);
     }
-    dwt_writetxdata(tx_frame_length, (uint8_t*) & test_msg, 0);
-    int err = dwt_starttx(DWT_START_TX_IMMEDIATE);//DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
-    dwt_settxantennadelay(global_tx_antenna_delay);
+    
+    uint32_t delay_time = (uint32_t)((systimestamp)>>8) + ((convertmicrosectodevicetimeu32(TAG_SEND_FINAL_DELAY_US)>>8));
+    
+	delay_time &= 0xFFFFFFFE; //Make sure last bit is zero
+	dwt_setdelayedtrxtime(delay_time);
+    to_lower_40bits(bcast_msg.tSF,systimestamp + (convertmicrosectodevicetimeu(TAG_SEND_FINAL_DELAY_US)));
+	
+	// Write the data
+	dwt_writetxdata(tx_frame_length, (uint8_t*) &bcast_msg, 0);
+
+	// Start the transmission
+	dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
+
+	// MP bug - TX antenna delay needs reprogramming as it is
+	// not preserved
+	dwt_settxantennadelay(TX_ANTENNA_DELAY);
+}
+
+void instance_process(){
+    static uint16_t ctr = 0;
+    if(dwm_status.node_id==0){
+        if(ctr%100==0){
+            //start a new sequence
+            //reset state
+            memset(global_tag_anchor_resp_rx_time,0xFA,sizeof(global_tag_anchor_resp_rx_time));
+            memset(global_tRR,0xFA,sizeof(global_tRR));
+            memset(global_tRP,0xFA,sizeof(global_tRP));
+            memset(global_tRF,0xFA,sizeof(global_tRF));
+            memset(global_tSP,0xFA,sizeof(global_tSP));
+            memset(global_tSF,0xFA,sizeof(global_tSF));
+            
+            dwt_forcetrxoff();
+            send_poll();
+            //kick start state machine
+            dwm_status.tx_state = DWM_SEND_RESPONSE;
+            dwm_status.timer_func(20000,dwt_timer_cb);
+        }
     }
-    if(++ctr>100){
+    
+    ctr++;
+    if(ctr>=100){
         ctr = 0;
     }
-#else
-#endif
-//    switch(multiBroadcast_states){
-//        case init:
-//            multiBroadcast_states = poll;
-//            break;
-//            
-//        case poll:
-//            stall_count = 0;
-////            dwt_forcetrxoff();  // Force the tx or rx state off
-//            send_poll();
-//            multiBroadcast_states = wait_response;
-//            break;
-//            
-//        case wait_receive:
-//            break;
-//            
-//        case wait_response:
-//            break;
-//            
-//        case wait_final:
-//            break;
-//            
-//        case final:
-//            break;
-//            
-//        case stall:
-//            break;
-//    }
-
-//#ifdef IS_TAG
-//    switch(tag_state){
-//        case tag_init:
-//            tag_state = tag_poll;
-//            break;
-//
-//        case tag_poll:
-//            stall_count = 0;
-//            dwt_forcetrxoff();  // Force the tx or rx state off
-//            send_poll();
-//            tag_state = tag_wait_response;
-//            break;
-//
-//        case tag_wait_response:
-//            wait_count++;
-//            if(wait_count > 200){
-//                tag_state = tag_poll;
-//                wait_count = 0;
-//            }
-//            break;
-//
-//        case tag_final:
-//            wait_count = 0;
-//            break;
-//
-//        case tag_stall:
-//            stall_count++;
-//            if(stall_count > 50){
-//                tag_state = tag_poll;
-//                stall_count = 0;
-//            }
-//            break;
-//    }
-//#endif
-//#ifdef IS_ANCHOR
-//    switch(anchor_state){
-//        case anchor_init:
-//            anchor_state = anchor_wait_receive;
-//            break;
-//
-//        case anchor_wait_receive:
-//            // Waiting for poll message
-//            break;
-//
-//        case anchor_wait_final:
-//            // Waiting for final message
-//            break;
-//    }
-//#endif
 }
 
 void incr_subsequence_counter(){
@@ -997,6 +1021,110 @@ void dw1000_populate_eui (uint8_t *eui_buf, uint8_t id) {
 }
 /*****https://github.com/lab11/polypoint******/
 
+void dwm_compute_distances()
+{
+    unsigned i;
+    
+//     double tRF;
+//         double tSR;
+//         double tRR; 
+//         double tSP;
+//         double tSF;
+//         double tRP;
+//         double aot;
+//         double tTOF;
+//         double dist;
+    for(i=0;i<NUM_TOTAL_NODES;++i){
+        // Correct TAG Times if rollover
+        uint64_t tRR_tmp = global_tRR[i];
+        uint64_t tSF_tmp = global_tSF[i];
+        
+        if (global_tSP[i] > tRR_tmp) {
+            tRR_tmp += TWOPOWER40;
+            tSF_tmp += TWOPOWER40;
+        }
+        if (tRR_tmp > tSF_tmp) {
+            tSF_tmp += TWOPOWER40;
+        }
+        global_tRR[i] = tRR_tmp;
+        global_tSF[i] = tSF_tmp;
+
+        // Correct ANCHOR times if rollover
+        if (global_tRP[i] > global_tSR) {
+            global_tSR += TWOPOWER40;
+            global_tRF[i] += TWOPOWER40;
+        }
+        if (global_tSR > global_tRF[i]) {
+            global_tRF[i] += TWOPOWER40;
+        }
+//
+//        tRF = ( double) global_tRF[i];
+//        tSR = ( double) global_tSR;
+//        tRR = ( double) global_tRR[i]; 
+//        tSP = ( double) global_tSP[i];
+//        tSF = ( double) global_tSF[i];
+//        tRP = ( double) global_tRP[i];
+        
+        uint64_t tRF_tRP = global_tRF[i]-global_tRP[i];
+        uint64_t tSF_tSP = global_tSF[i]-global_tSP[i];
+        uint64_t tRF_tSR = global_tRF[i]-global_tSR;
+        uint64_t tSF_tRR = global_tSF[i]-global_tRR[i];
+        long double tmp,tmp2;
+        
+        //if (tRF != 0.0 && tSR != 0.0 && tRR != 0.0 && tSP != 0.0 && tSF != 0.0 && tRP != 0.0) {
+            tmp = (long double) tRF_tRP;
+            tmp2 = (long double) tSF_tSP;
+            tmp /= tmp2; //aot
+            tmp2 = (long double) tSF_tRR;
+            tmp *= tmp2; //(tSF - tRR) * aot
+            tmp *= -1.; //-(tSF - tRR) * aot
+            tmp2 = (long double)tRF_tSR;
+            tmp += tmp2; //tTOF
+            tmp /= 426.40678517020814; //dist
+            //aot = (tRF - tRP) / (tSF - tSP);
+            //tTOF = (tRF - tSR)-(tSF - tRR) * aot;
+            //dist = (tTOF * DWT_TIME_UNITS) / 2;
+              
+            //dist *= SPEED_OF_LIGHT;
+//            
+            dwm_status.distance[i] = (double)tmp;
+        //}
+    }
+}
+
+void dwt_timer_interrupt()
+{
+    dwm_status.timer_interrupt = 0;
+    
+    switch(dwm_status.tx_state){
+        case DWM_SEND_POLL:
+            dwm_status.tx_state = DWM_SEND_RESPONSE;
+            dwt_forcetrxoff();
+            send_poll();
+            dwm_status.timer_func(20000+2000*dwm_status.node_id,dwt_timer_cb);
+            break;
+        case DWM_SEND_RESPONSE:
+            dwm_status.tx_state = DWM_SEND_FINAL;
+            dwt_forcetrxoff();
+            send_response();
+            dwm_status.timer_func(20000+2000*dwm_status.node_id,dwt_timer_cb);
+            break;
+        case DWM_SEND_FINAL:
+            dwm_status.tx_state = DWM_COMPUTE_TOF;
+            dwt_forcetrxoff();
+            send_final();
+            dwm_status.timer_func(20000-2000*dwm_status.node_id,dwt_timer_cb);
+            break;
+        case DWM_COMPUTE_TOF:
+            dwm_status.tx_state = DWM_SEND_POLL;
+            //TODO: compute results
+            dwm_compute_distances();
+            break;
+        default:
+            //error!!!
+            break;
+    };
+}
 /**
  * This interrupt function is tied to the IRQ pin from the DWM1000 module
  */
