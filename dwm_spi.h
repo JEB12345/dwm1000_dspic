@@ -98,12 +98,14 @@ enum dwm_tx_state {
         DWM_SEND_POLL,
         DWM_SEND_RESPONSE,
         DWM_SEND_FINAL,
-        DWM_COMPUTE_TOF
+        DWM_COMPUTE_TOF,
+        DWM_SEND_DISTANCES
     } ;
 
     typedef struct {
         uint8_t     irq_enable;
-        double       distance[NUM_TOTAL_NODES]; //current distance measurement
+        double      distance[NUM_TOTAL_NODES]; //current distance measurement (raw)
+        uint16_t    distance_mm[NUM_TOTAL_NODES]; //current distance measurement in mm (fixed offset removed to fit in uint16)
         void (*timer_func)(uint16_t microseconds,void (*cb)());
         volatile unsigned timer_interrupt;
         enum dwm_tx_state   tx_state;

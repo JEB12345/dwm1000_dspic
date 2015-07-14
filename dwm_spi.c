@@ -443,7 +443,6 @@ void dwt_timer_cb(){
 
 // Triggered when we receive a packet
 void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
-    int err;
     uint8_t rxtimestamp[5];
     
     if (rxd->event == DWT_SIG_RX_OKAY) {
@@ -464,11 +463,16 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                 memset(global_tSF,0xFA,sizeof(global_tSF));
                 //start transmit sequence
                 dwm_status.tx_state = DWM_SEND_POLL;
-                dwm_status.timer_func(dwm_status.node_id*2000,dwt_timer_cb);
+                dwm_status.timer_func(dwm_status.node_id*1000,dwt_timer_cb);
             }
-            //store information contained in and related to poll message            
-            global_tRP[msg_ptr->sourceAddr] = from_lower_40_bits(rxtimestamp);
-            global_tSP[msg_ptr->sourceAddr] = from_lower_40_bits(&global_recv_pkt[offsetof(struct ieee154_bcast_msg, tSP)]);
+            //store information contained in and related to poll message  
+//            if(msg_ptr->sourceAddr==1){
+//                global_tRP[msg_ptr->sourceAddr] = 0x1234567890L;
+//            } else {
+                
+                global_tRP[msg_ptr->sourceAddr] = from_lower_40_bits(rxtimestamp);
+//            }
+            global_tSP[msg_ptr->sourceAddr] = from_lower_40_bits(msg_ptr->tSP);
         } else if (msg_ptr->messageType == DWM_SEND_RESPONSE){
             //store information contained in and related to response message
             dwt_readrxtimestamp(rxtimestamp);
@@ -478,14 +482,11 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
             global_tRF[msg_ptr->sourceAddr] = from_lower_40_bits(rxtimestamp);
             global_tRR[msg_ptr->sourceAddr] = from_lower_40_bits(msg_ptr->tRR[dwm_status.node_id]); //note: own id as we're reading "our" reception time on a remote node
             global_tSF[msg_ptr->sourceAddr] = from_lower_40_bits(msg_ptr->tSF);
-            //TODO: trigger a TOF calculation when everything has been received
         }
-        //TODO: handle incoming packets
         
         dwt_forcetrxoff();        
         dwt_setrxtimeout(0); //TODO: not sure if needed
         dwt_rxenable(0);
-
     }
 //    int err;
 //
@@ -887,6 +888,11 @@ void send_final(){
 	dwt_settxantennadelay(TX_ANTENNA_DELAY);
 }
 
+void send_distances()
+{
+    
+}
+
 void instance_process(){
     static uint16_t ctr = 0;
     if(dwm_status.node_id==0){
@@ -1026,31 +1032,21 @@ void dw1000_populate_eui (uint8_t *eui_buf, uint8_t id) {
  
 void dwm_compute_distances()
 {
-    long double tmp,tmp2;
+    long double tmp, tmp2;
     uint64_t tRF_tRP;
-        uint64_t tSF_tSP;
-        uint64_t tRF_tSR;
-        uint64_t tSF_tRR;
-        uint64_t tRR_tmp;
-        uint64_t tSF_tmp;
+    uint64_t tSF_tSP;
+    uint64_t tRF_tSR;
+    uint64_t tSF_tRR;
+    uint64_t tRR_tmp;
+    uint64_t tSF_tmp;
+    uint64_t local_tSR;
     unsigned i;
-    
-//     double tRF;
-//         double tSR;
-//         double tRR; 
-//         double tSP;
-//         double tSF;
-//         double tRP;
-//         double aot;
-//         double tTOF;
-//         double dist;
-    
-        
-    for(i=0;i<NUM_TOTAL_NODES;++i){
+
+    for (i = 0; i < NUM_TOTAL_NODES; ++i) {
         // Correct TAG Times if rollover
-         tRR_tmp = global_tRR[i];
-         tSF_tmp = global_tSF[i];
-        
+        tRR_tmp = global_tRR[i];
+        tSF_tmp = global_tSF[i];
+
         if (global_tSP[i] > tRR_tmp) {
             tRR_tmp += TWOPOWER40;
             tSF_tmp += TWOPOWER40;
@@ -1060,55 +1056,46 @@ void dwm_compute_distances()
         }
         global_tRR[i] = tRR_tmp;
         global_tSF[i] = tSF_tmp;
-
-        // Correct ANCHOR times if rollover
-        if (global_tRP[i] > global_tSR) {
-            global_tSR += TWOPOWER40;
-            global_tRF[i] += TWOPOWER40;
-        }
-        if (global_tSR > global_tRF[i]) {
-            global_tRF[i] += TWOPOWER40;
-        }
 //
-//        tRF = ( double) global_tRF[i];
-//        tSR = ( double) global_tSR;
-//        tRR = ( double) global_tRR[i]; 
-//        tSP = ( double) global_tSP[i];
-//        tSF = ( double) global_tSF[i];
-//        tRP = ( double) global_tRP[i];
-        
-         tRF_tRP = global_tRF[i]-global_tRP[i];
-         tSF_tSP = global_tSF[i]-global_tSP[i];
-         tRF_tSR = global_tRF[i]-global_tSR;
-         tSF_tRR = global_tSF[i]-global_tRR[i];
-        
-        
+        local_tSR = global_tSR;
+        // Correct ANCHOR times if rollover
+        if (global_tRP[i] > local_tSR) {
+            local_tSR += TWOPOWER40;
+            global_tRF[i] += TWOPOWER40;
+        }
+        if (local_tSR > global_tRF[i]) {
+            global_tRF[i] += TWOPOWER40;
+        }
+
+        tRF_tRP = global_tRF[i] - global_tRP[i];
+        tSF_tSP = global_tSF[i] - global_tSP[i];
+        tRF_tSR = global_tRF[i] - local_tSR;
+        tSF_tRR = global_tSF[i] - global_tRR[i];
+
         //if (tRF != 0.0 && tSR != 0.0 && tRR != 0.0 && tSP != 0.0 && tSF != 0.0 && tRP != 0.0) {
-            tmp = (long double) tRF_tRP;
-            tmp2 = (long double) tSF_tSP;
-            if(i==1){
-                dwm_status.distance[2] = 1;
-            }
-            if(tSF_tSP==0){
-                tmp /= tmp2+1; //aot
-            } else {
-                tmp /= tmp2; //aot
-            }
-            tmp2 = (long double) tSF_tRR;
-            tmp *= tmp2; //(tSF - tRR) * aot
-            tmp *= -1.; //-(tSF - tRR) * aot
-            tmp2 = (long double)tRF_tSR;
-            tmp += tmp2; //tTOF
-            tmp /= 426.40678517020814; //dist
-            //aot = (tRF - tRP) / (tSF - tSP);
-            //tTOF = (tRF - tSR)-(tSF - tRR) * aot;
-            //dist = (tTOF * DWT_TIME_UNITS) / 2;
-              
-            //dist *= SPEED_OF_LIGHT;
-//            
-           
-            dwm_status.distance[i] = (double)tmp;
-            
+        tmp = (long double) tRF_tRP;
+        tmp2 = (long double) tSF_tSP;
+        if (i == 1) {
+            dwm_status.distance[2] = 1;
+        }
+        if (tSF_tSP == 0) {
+            tmp /= tmp2 + 1; //aot (divide by zero crashes the PIC)
+        } else {
+            tmp /= tmp2; //aot
+        }
+        tmp2 = (long double) tSF_tRR;
+        tmp *= tmp2; //(tSF - tRR) * aot
+        tmp *= -1.; //-(tSF - tRR) * aot
+        tmp2 = (long double) tRF_tSR;
+        tmp += tmp2; //tTOF
+        tmp /= 426.40678517020814; //dist ==  DWT_TIME_UNITS) / 2 * SPEED_OF_LIGHT ;
+        //aot = (tRF - tRP) / (tSF - tSP);
+        //tTOF = (tRF - tSR)-(tSF - tRR) * aot;
+        //dist = (tTOF * DWT_TIME_UNITS) / 2;
+        //dist *= SPEED_OF_LIGHT;
+
+        dwm_status.distance[i] = (double) tmp;
+        dwm_status.distance_mm[i] = (uint16_t)((dwm_status.distance[i]-150)*1000.); //constant offset
         //}
     }
 }
@@ -1122,27 +1109,38 @@ void dwt_timer_interrupt()
             dwm_status.tx_state = DWM_SEND_RESPONSE;
             dwt_forcetrxoff();
             send_poll();
-            dwm_status.timer_func(20000+2000*dwm_status.node_id,dwt_timer_cb);
+            dwm_status.timer_func(20000+1000*dwm_status.node_id,dwt_timer_cb);
             break;
         case DWM_SEND_RESPONSE:
             dwm_status.tx_state = DWM_SEND_FINAL;
             dwt_forcetrxoff();
             send_response();
-            dwm_status.timer_func(20000+2000*dwm_status.node_id,dwt_timer_cb);
+            dwm_status.timer_func(20000+1000*dwm_status.node_id,dwt_timer_cb);
             break;
         case DWM_SEND_FINAL:
             dwm_status.tx_state = DWM_COMPUTE_TOF;
             dwt_forcetrxoff();
             send_final();
-            dwm_status.timer_func(20000-2000*dwm_status.node_id,dwt_timer_cb);
+            dwm_status.timer_func(20000-1000*dwm_status.node_id,dwt_timer_cb);
             break;
         case DWM_COMPUTE_TOF:
-            dwm_status.tx_state = DWM_SEND_POLL;
+            if(dwm_status.node_id>=NUM_FLOATING_NODES){
+                dwm_status.tx_state = DWM_SEND_DISTANCES; //fixed nodes need to broadcast measurement results
+                dwm_status.timer_func(20000+1000*(dwm_status.node_id-NUM_FLOATING_NODES),dwt_timer_cb);
+            } else {
+                dwm_status.tx_state = DWM_SEND_POLL;
+            }
             //TODO: compute results
             dwm_compute_distances();
             break;
+        case DWM_SEND_DISTANCES:
+            dwm_status.tx_state = DWM_SEND_POLL;
+            dwt_forcetrxoff();
+            send_distances();
+            break;
         default:
             //error!!!
+            dwm_status.tx_state = DWM_SEND_POLL;
             break;
     };
 }
