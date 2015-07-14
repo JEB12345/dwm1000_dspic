@@ -12,6 +12,7 @@
 #include <spi.h>
 #include <string.h>
 #include <xc.h>
+#include <float.h>
 
 dwm_1000_status dwm_status;
 uint16_t wait_count = 0;
@@ -901,6 +902,7 @@ void instance_process(){
             
             dwt_forcetrxoff();
             send_poll();
+            
             //kick start state machine
             dwm_status.tx_state = DWM_SEND_RESPONSE;
             dwm_status.timer_func(20000,dwt_timer_cb);
@@ -1021,8 +1023,16 @@ void dw1000_populate_eui (uint8_t *eui_buf, uint8_t id) {
 }
 /*****https://github.com/lab11/polypoint******/
 
+ 
 void dwm_compute_distances()
 {
+    long double tmp,tmp2;
+    uint64_t tRF_tRP;
+        uint64_t tSF_tSP;
+        uint64_t tRF_tSR;
+        uint64_t tSF_tRR;
+        uint64_t tRR_tmp;
+        uint64_t tSF_tmp;
     unsigned i;
     
 //     double tRF;
@@ -1034,10 +1044,12 @@ void dwm_compute_distances()
 //         double aot;
 //         double tTOF;
 //         double dist;
+    
+        
     for(i=0;i<NUM_TOTAL_NODES;++i){
         // Correct TAG Times if rollover
-        uint64_t tRR_tmp = global_tRR[i];
-        uint64_t tSF_tmp = global_tSF[i];
+         tRR_tmp = global_tRR[i];
+         tSF_tmp = global_tSF[i];
         
         if (global_tSP[i] > tRR_tmp) {
             tRR_tmp += TWOPOWER40;
@@ -1065,16 +1077,23 @@ void dwm_compute_distances()
 //        tSF = ( double) global_tSF[i];
 //        tRP = ( double) global_tRP[i];
         
-        uint64_t tRF_tRP = global_tRF[i]-global_tRP[i];
-        uint64_t tSF_tSP = global_tSF[i]-global_tSP[i];
-        uint64_t tRF_tSR = global_tRF[i]-global_tSR;
-        uint64_t tSF_tRR = global_tSF[i]-global_tRR[i];
-        long double tmp,tmp2;
+         tRF_tRP = global_tRF[i]-global_tRP[i];
+         tSF_tSP = global_tSF[i]-global_tSP[i];
+         tRF_tSR = global_tRF[i]-global_tSR;
+         tSF_tRR = global_tSF[i]-global_tRR[i];
+        
         
         //if (tRF != 0.0 && tSR != 0.0 && tRR != 0.0 && tSP != 0.0 && tSF != 0.0 && tRP != 0.0) {
             tmp = (long double) tRF_tRP;
             tmp2 = (long double) tSF_tSP;
-            tmp /= tmp2; //aot
+            if(i==1){
+                dwm_status.distance[2] = 1;
+            }
+            if(tSF_tSP==0){
+                tmp /= tmp2+1; //aot
+            } else {
+                tmp /= tmp2; //aot
+            }
             tmp2 = (long double) tSF_tRR;
             tmp *= tmp2; //(tSF - tRR) * aot
             tmp *= -1.; //-(tSF - tRR) * aot
@@ -1087,7 +1106,9 @@ void dwm_compute_distances()
               
             //dist *= SPEED_OF_LIGHT;
 //            
+           
             dwm_status.distance[i] = (double)tmp;
+            
         //}
     }
 }
