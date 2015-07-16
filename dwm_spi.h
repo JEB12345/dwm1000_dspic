@@ -107,6 +107,7 @@ enum dwm_tx_state {
         double      distance[NUM_TOTAL_NODES]; //current distance measurement (raw)
         uint16_t    distance_mm[NUM_TOTAL_NODES]; //current distance measurement in mm (fixed offset removed to fit in uint16)
         void (*timer_func)(uint16_t microseconds,void (*cb)());
+        uint16_t    distance_mm_fixed[NUM_FIXED_NODES][NUM_TOTAL_NODES]; //distances (mm) measured by the fixed nodes (in mm) 
         volatile unsigned timer_interrupt;
         enum dwm_tx_state   tx_state;
         uint8_t node_id;
