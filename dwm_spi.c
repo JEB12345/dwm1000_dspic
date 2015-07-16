@@ -381,7 +381,8 @@ uint8_t dwm_init(uint8_t node_id, void (*timer_func)(uint16_t microseconds,void 
         // Allow data and ack frames
         dwt_enableframefilter(DWT_FF_DATA_EN | DWT_FF_ACK_EN);
 
-        dw1000_populate_eui(eui_array, TAG_EUI);
+        dw1000_populate_eui(eui_array, TAG_EUI+dwm_status.node_id);
+        
   	dwt_seteui(eui_array);
         dwt_setpanid(DW1000_PANID);
 
@@ -393,7 +394,7 @@ uint8_t dwm_init(uint8_t node_id, void (*timer_func)(uint16_t microseconds,void 
         dwt_setautorxreenable(1);
         dwt_setdblrxbuffmode(0);
         dwt_enableautoack(5 /*ACK_RESPONSE_TIME*/);
-
+        dwt_rxenable(0);
         // Configure sleep
         {
             int mode = DWT_LOADUCODE    |
@@ -1075,7 +1076,7 @@ void dwm_compute_distances()
         //if (tRF != 0.0 && tSR != 0.0 && tRR != 0.0 && tSP != 0.0 && tSF != 0.0 && tRP != 0.0) {
         tmp = (long double) tRF_tRP;
         tmp2 = (long double) tSF_tSP;
-        if (i == 1) {
+        if (i == 0) {
             dwm_status.distance[2] = 1;
         }
         if (tSF_tSP == 0) {
