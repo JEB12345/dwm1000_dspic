@@ -832,11 +832,7 @@ void dwm_compute_distances()
         //dist *= SPEED_OF_LIGHT;
 
         dwm_status.distance[i] = (double) tmp;
-#ifdef CONF71
-        dwm_status.distance_mm[i] = (uint16_t)((dwm_status.distance[i]-154.274)*1000.); //constant offset
-#else
         dwm_status.distance_mm[i] = (uint16_t)((dwm_status.distance[i]-150)*1000.); //constant offset
-#endif
         } else {
             //didn't receive all necessary data
             dwm_status.distance[i] = 0;
