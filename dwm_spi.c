@@ -206,6 +206,8 @@ uint8_t dwm_init(uint8_t node_id, void (*timer_func)(uint16_t microseconds,void 
     dwm_status.timer_interrupt = 0; 
     dwm_status.tx_state = DWM_SEND_POLL;
     dwm_status.node_id = node_id;
+    memset(dwm_status.distance_mm, 0 ,sizeof(dwm_status.distance_mm));
+    memset(dwm_status.distance_mm_fixed, 0 ,sizeof(dwm_status.distance_mm_fixed));
     
     dwm_reset();
 
@@ -822,63 +824,64 @@ void dwm_compute_distances()
     unsigned i;
 
     for (i = 0; i < NUM_TOTAL_NODES; ++i) {
-        if(global_received_poll[i] && global_received_response[i] && global_received_final[i]){
-        // Correct TAG Times if rollover
-        tRR_tmp = global_tRR[i];
-        tSF_tmp = global_tSF[i];
+        if (global_received_poll[i] && global_received_response[i] && global_received_final[i]) {
+            // Correct TAG Times if rollover
+            tRR_tmp = global_tRR[i];
+            tSF_tmp = global_tSF[i];
 
-        if (global_tSP[i] > tRR_tmp) {
-            tRR_tmp += TWOPOWER40;
-            tSF_tmp += TWOPOWER40;
-        }
-        if (tRR_tmp > tSF_tmp) {
-            tSF_tmp += TWOPOWER40;
-        }
-        global_tRR[i] = tRR_tmp;
-        global_tSF[i] = tSF_tmp;
-        
-        local_tSR = global_tSR;
-        // Correct ANCHOR times if rollover
-        if (global_tRP[i] > local_tSR) {
-            local_tSR += TWOPOWER40;
-            global_tRF[i] += TWOPOWER40;
-        }
-        if (local_tSR > global_tRF[i]) {
-            global_tRF[i] += TWOPOWER40;
-        }
+            if (global_tSP[i] > tRR_tmp) {
+                tRR_tmp += TWOPOWER40;
+                tSF_tmp += TWOPOWER40;
+            }
+            if (tRR_tmp > tSF_tmp) {
+                tSF_tmp += TWOPOWER40;
+            }
+            global_tRR[i] = tRR_tmp;
+            global_tSF[i] = tSF_tmp;
 
-        tRF_tRP = global_tRF[i] - global_tRP[i];
-        tSF_tSP = global_tSF[i] - global_tSP[i];
-        tRF_tSR = global_tRF[i] - local_tSR;
-        tSF_tRR = global_tSF[i] - global_tRR[i];
+            local_tSR = global_tSR;
+            // Correct ANCHOR times if rollover
+            if (global_tRP[i] > local_tSR) {
+                local_tSR += TWOPOWER40;
+                global_tRF[i] += TWOPOWER40;
+            }
+            if (local_tSR > global_tRF[i]) {
+                global_tRF[i] += TWOPOWER40;
+            }
 
-        tmp = (long double) tRF_tRP;
-        tmp2 = (long double) tSF_tSP;
-        if (i == 0) {
-            dwm_status.distance[2] = 1;
-        }
-        if (tSF_tSP == 0) {
-            tmp /= tmp2 + 1; //aot (divide by zero crashes the PIC)
-        } else {
-            tmp /= tmp2; //aot
-        }
-        tmp2 = (long double) tSF_tRR;
-        tmp *= tmp2; //(tSF - tRR) * aot
-        tmp *= -1.; //-(tSF - tRR) * aot
-        tmp2 = (long double) tRF_tSR;
-        tmp += tmp2; //tTOF
-        tmp /= 426.40678517020814; //dist ==  DWT_TIME_UNITS) / 2 * SPEED_OF_LIGHT ;
-        //aot = (tRF - tRP) / (tSF - tSP);
-        //tTOF = (tRF - tSR)-(tSF - tRR) * aot;
-        //dist = (tTOF * DWT_TIME_UNITS) / 2;
-        //dist *= SPEED_OF_LIGHT;
+            tRF_tRP = global_tRF[i] - global_tRP[i];
+            tSF_tSP = global_tSF[i] - global_tSP[i];
+            tRF_tSR = global_tRF[i] - local_tSR;
+            tSF_tRR = global_tSF[i] - global_tRR[i];
 
-        dwm_status.distance[i] = (double) tmp;
-        dwm_status.distance_mm[i] = (uint16_t)((dwm_status.distance[i]-150)*1000.); //constant offset
+            tmp = (long double) tRF_tRP;
+            tmp2 = (long double) tSF_tSP;
+            if (i == 0) {
+                dwm_status.distance[2] = 1;
+            }
+            if (tSF_tSP == 0) {
+                tmp /= tmp2 + 1; //aot (divide by zero crashes the PIC)
+            } else {
+                tmp /= tmp2; //aot
+            }
+            tmp2 = (long double) tSF_tRR;
+            tmp *= tmp2; //(tSF - tRR) * aot
+            tmp *= -1.; //-(tSF - tRR) * aot
+            tmp2 = (long double) tRF_tSR;
+            tmp += tmp2; //tTOF
+            tmp /= 426.40678517020814; //dist ==  DWT_TIME_UNITS) / 2 * SPEED_OF_LIGHT ;
+            //aot = (tRF - tRP) / (tSF - tSP);
+            //tTOF = (tRF - tSR)-(tSF - tRR) * aot;
+            //dist = (tTOF * DWT_TIME_UNITS) / 2;
+            //dist *= SPEED_OF_LIGHT;
+
+            dwm_status.distance[i] = (double) tmp;
+            dwm_status.distance_mm[i] = (uint16_t) ((dwm_status.distance[i] - 150)*1000.); //constant offset
         } else {
             //didn't receive all necessary data
             dwm_status.distance[i] = 0;
-            dwm_status.distance_mm[i] = 0; 
+            dwm_status.distance_mm[i] = 0;
+            dwm_status.distance_mm[i] = (global_received_poll[i]<<2) | (global_received_response[i]<<1 )| global_received_final[i]; //which message(s) go lost
         }
         //reset flags
         global_received_poll[i] = 0;
@@ -896,7 +899,7 @@ void dwt_timer_interrupt()
             dwm_status.tx_state = DWM_SEND_RESPONSE;
             dwt_forcetrxoff();
             send_poll();
-            dwm_status.timer_func(20000+1000*dwm_status.node_id,dwt_timer_cb);
+            dwm_status.timer_func(20000+0*1000*dwm_status.node_id,dwt_timer_cb);
             break;
         case DWM_SEND_RESPONSE:
             dwm_status.tx_state = DWM_SEND_FINAL;
@@ -908,16 +911,15 @@ void dwt_timer_interrupt()
             dwm_status.tx_state = DWM_COMPUTE_TOF;
             dwt_forcetrxoff();
             send_final();
-            dwm_status.timer_func(20000-1000*dwm_status.node_id,dwt_timer_cb);
+            dwm_status.timer_func(20000-0*1000*dwm_status.node_id,dwt_timer_cb);
             break;
         case DWM_COMPUTE_TOF:
             if(dwm_status.node_id>=NUM_FLOATING_NODES){
                 dwm_status.tx_state = DWM_SEND_DISTANCES; //fixed nodes need to broadcast measurement results
-                dwm_status.timer_func(20000+1000*(dwm_status.node_id-NUM_FLOATING_NODES),dwt_timer_cb);
+                dwm_status.timer_func(20000+0*1000*(dwm_status.node_id-NUM_FLOATING_NODES),dwt_timer_cb);
             } else {
                 dwm_status.tx_state = DWM_SEND_POLL;
             }
-            //TODO: compute results
             dwm_compute_distances();
             break;
         case DWM_SEND_DISTANCES:
