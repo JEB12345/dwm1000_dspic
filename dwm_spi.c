@@ -13,6 +13,7 @@
 #include <string.h>
 #include <xc.h>
 #include <float.h>
+#include <math.h>
 
 dwm_1000_status dwm_status;
 uint16_t wait_count = 0;
@@ -117,6 +118,7 @@ tag_states tag_state = tag_init;
     static uint64_t global_tSP[NUM_TOTAL_NODES];
     static uint64_t global_tSF[NUM_TOTAL_NODES];
     static uint8_t global_received_poll[NUM_TOTAL_NODES]; //flags to indicate from which nodes we received a valid message
+    static uint8_t global_received_NLOS[NUM_TOTAL_NODES];
     static uint8_t global_received_response[NUM_TOTAL_NODES];
     static uint8_t global_received_final[NUM_TOTAL_NODES];
     static uint8_t global_recv_pkt[512];
@@ -223,7 +225,7 @@ uint8_t dwm_init(uint8_t node_id, void (*timer_func)(uint16_t microseconds,void 
     
     Delay_us(1000);
 
-    result = dwt_initialise(DWT_LOADUCODE    |
+    result = dwt_initialise(DWT_LOADUCODE    | DWT_LOADXTALTRIM |
                          DWT_LOADLDO      |
                          DWT_LOADTXCONFIG |
                          DWT_LOADLDOTUNE);
@@ -254,6 +256,7 @@ uint8_t dwm_init(uint8_t node_id, void (*timer_func)(uint16_t microseconds,void 
      * https://github.com/lab11/polypoint
      */
     // Set the parameters of ranging and channel and whatnot
+    /*
     global_ranging_config.chan           = 2;
 	global_ranging_config.prf            = DWT_PRF_64M;
 	global_ranging_config.txPreambLength = DWT_PLEN_64;//DWT_PLEN_4096
@@ -263,10 +266,28 @@ uint8_t dwm_init(uint8_t node_id, void (*timer_func)(uint16_t microseconds,void 
 	global_ranging_config.rxCode         = 9;  // preamble code
 	global_ranging_config.nsSFD          = 0;
 	global_ranging_config.dataRate       = DWT_BR_6M8;
-	global_ranging_config.phrMode        = DWT_PHRMODE_EXT; //Enable extended PHR mode (up to 1024-byte packets)
+	global_ranging_config.phrMode        = DWT_PHRMODE_EXT; //Enable extended PHR mode (up to 1024-byte packets) //TODO why?
 	global_ranging_config.smartPowerEn   = 0;
 	global_ranging_config.sfdTO          = 64+8+1;//(1025 + 64 - 32);
 	dwt_configure(&global_ranging_config, 0);//(DWT_LOADANTDLY | DWT_LOADXTALTRIM));
+	dwt_setsmarttxpower(global_ranging_config.smartPowerEn);
+     */
+    
+    
+    global_ranging_config.chan           = 7;
+	global_ranging_config.prf            = DWT_PRF_64M;
+	global_ranging_config.txPreambLength = DWT_PLEN_256;//DWT_PLEN_4096
+	// global_ranging_config.txPreambLength = DWT_PLEN_256;
+	global_ranging_config.rxPAC          = DWT_PAC16;
+	global_ranging_config.txCode         = 17;  // preamble code
+	global_ranging_config.rxCode         = 17;  // preamble code
+	global_ranging_config.nsSFD          = 1;
+	global_ranging_config.dataRate       = DWT_BR_6M8;
+	global_ranging_config.phrMode        = DWT_PHRMODE_STD; //Enable extended PHR mode (up to 1024-byte packets) //TODO why?
+	global_ranging_config.smartPowerEn   = 0;
+	global_ranging_config.sfdTO          = 384;//512;//64+8+1;//(1025 + 64 - 32);
+    
+	dwt_configure(&global_ranging_config, DWT_LOADANTDLY | DWT_LOADXTALTRIM);
 	dwt_setsmarttxpower(global_ranging_config.smartPowerEn);
 
     dwt_configeventcounters(1);
@@ -418,6 +439,7 @@ void dwt_timer_cb(){
 void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
     uint8_t rxtimestamp[5];
     unsigned i; //loop counter
+    
     if (rxd->event == DWT_SIG_RX_OKAY) {
         dwt_readrxdata(global_recv_pkt, rxd->datalength, 0);
         //Assume everything is a bcast msg for now
@@ -425,6 +447,28 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
         msg_ptr = (struct ieee154_bcast_msg*) global_recv_pkt;
         
         dwt_readrxtimestamp(rxtimestamp);
+        
+        //get diagnostics info
+        dwt_readdignostics(&(dwm_status.rxdiag));
+        //check if packet is good enough (LOS)
+        uint32_t FP1 = dwm_status.rxdiag.firstPathAmp1;
+        uint32_t FP2 = dwm_status.rxdiag.firstPathAmp2;
+        uint32_t FP3 = dwm_status.rxdiag.firstPathAmp3;
+        FP1*=FP1;
+        FP2*=FP2;
+        FP3*=FP3;
+        long double log10FP = (long double)(FP1+FP2+FP3);
+        log10FP = log10l(log10FP);
+        long double log10N = (long double)dwm_status.rxdiag.maxGrowthCIR;
+        log10N = log10l(log10N);
+        long double rx_qual = log10N-log10FP;
+        //if(rx_qual>-4.1175099262876804L){ //10dBm
+        if(rx_qual>-4.5175099262876808L){ //6dBm//(LIMIT/10-np.log10(2**17)) 
+            //probably a reflection, set ignore flag
+            global_received_NLOS[msg_ptr->sourceAddr] = 1;
+        }
+        
+        
         if(msg_ptr->messageType == DWM_SEND_POLL){
             if(msg_ptr->sourceAddr==0){ //received poll from first node: start of new sequence
                 //reset state
@@ -824,7 +868,7 @@ void dwm_compute_distances()
     unsigned i;
 
     for (i = 0; i < NUM_TOTAL_NODES; ++i) {
-        if (global_received_poll[i] && global_received_response[i] && global_received_final[i]) {
+        if (global_received_poll[i] && global_received_response[i] && global_received_final[i] && !global_received_NLOS[i]) {
             // Correct TAG Times if rollover
             tRR_tmp = global_tRR[i];
             tSF_tmp = global_tSF[i];
@@ -881,12 +925,13 @@ void dwm_compute_distances()
             //didn't receive all necessary data
             dwm_status.distance[i] = 0;
             dwm_status.distance_mm[i] = 0;
-            dwm_status.distance_mm[i] = (global_received_poll[i]<<2) | (global_received_response[i]<<1 )| global_received_final[i]; //which message(s) go lost
+            dwm_status.distance_mm[i] = (global_received_NLOS[i]<<3)|(global_received_poll[i]<<2) | (global_received_response[i]<<1 )| global_received_final[i]; //which message(s) go lost
         }
         //reset flags
         global_received_poll[i] = 0;
         global_received_response[i] = 0;
         global_received_final[i] = 0;
+        global_received_NLOS[i] = 0;
     }
 }
 

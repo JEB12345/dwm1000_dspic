@@ -21,10 +21,10 @@
 #define DWM_RESET_ON DWM_RESET_TRIS = 0; DWM_RESET_OUT = 0
 #define DWM_RESET_OFF DWM_RESET_TRIS = 1
 
-#define TAG_SEND_POLL_DELAY_US 400
-#define TAG_SEND_FINAL_DELAY_US 400
-#define FIXED_SEND_DISTANCES_DELAY_US 400
-#define ANC_RESP_DELAY 400
+#define TAG_SEND_POLL_DELAY_US 600 //600
+#define TAG_SEND_FINAL_DELAY_US 600
+#define FIXED_SEND_DISTANCES_DELAY_US 600
+#define ANC_RESP_DELAY 600
 #define TX_ANTENNA_DELAY 0
 
 #define TWOPOWER40 1099511627776L // decimal value of 2^40 to correct timeroverflow between timestamps
@@ -112,6 +112,7 @@ enum dwm_tx_state {
         volatile unsigned timer_interrupt;
         enum dwm_tx_state   tx_state;
         uint8_t node_id;
+        dwt_rxdiag_t rxdiag;
     } dwm_1000_status;
 
 #ifdef	__cplusplus
