@@ -462,8 +462,9 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
         long double log10N = (long double)dwm_status.rxdiag.maxGrowthCIR;
         log10N = log10l(log10N);
         long double rx_qual = log10N-log10FP;
-        //if(rx_qual>-4.1175099262876804L){ //10dBm
-        if(rx_qual>-4.5175099262876808L){ //6dBm//(LIMIT/10-np.log10(2**17)) 
+        //Threshold for NLOS
+        if(rx_qual>-4.1175099262876804L){ //10dBm
+        //if(rx_qual>-4.5175099262876808L){ //6dBm//(LIMIT/10-np.log10(2**17)) 
             //probably a reflection, set ignore flag
             global_received_NLOS[msg_ptr->sourceAddr] = 1;
         }
@@ -471,6 +472,7 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
         
         if(msg_ptr->messageType == DWM_SEND_POLL){
             if(msg_ptr->sourceAddr==0){ //received poll from first node: start of new sequence
+                
                 //reset state
                 memset(global_tag_anchor_resp_rx_time,0x0,sizeof(global_tag_anchor_resp_rx_time));
                 memset(global_tRR,0x0,sizeof(global_tRR));
@@ -721,7 +723,7 @@ void send_distances()
 void instance_process(){
     static uint16_t ctr = 0;
     if(dwm_status.node_id==0){
-        if(ctr%100==0){
+        if(ctr%67==0){ //15Hz
             //start a new sequence
             //reset state
             memset(global_tag_anchor_resp_rx_time,0x0,sizeof(global_tag_anchor_resp_rx_time));
@@ -956,22 +958,23 @@ void dwt_timer_interrupt()
             dwm_status.tx_state = DWM_COMPUTE_TOF;
             dwt_forcetrxoff();
             send_final();
-            dwm_status.timer_func(20000-0*1000*dwm_status.node_id,dwt_timer_cb);
+            dwm_status.timer_func(20000-1000*dwm_status.node_id,dwt_timer_cb);
             break;
         case DWM_COMPUTE_TOF:
-            if(dwm_status.node_id>=NUM_FLOATING_NODES){
-                dwm_status.tx_state = DWM_SEND_DISTANCES; //fixed nodes need to broadcast measurement results
-                dwm_status.timer_func(20000+0*1000*(dwm_status.node_id-NUM_FLOATING_NODES),dwt_timer_cb);
-            } else {
+//            if(dwm_status.node_id>=NUM_FLOATING_NODES){
+//                dwm_status.tx_state = DWM_SEND_DISTANCES; //fixed nodes need to broadcast measurement results
+//                dwm_status.timer_func(20000+0*1000*(dwm_status.node_id-NUM_FLOATING_NODES),dwt_timer_cb);
+//            } else {
                 dwm_status.tx_state = DWM_SEND_POLL;
-            }
+//            }
             dwm_compute_distances();
             break;
-        case DWM_SEND_DISTANCES:
-            dwm_status.tx_state = DWM_SEND_POLL;
-            dwt_forcetrxoff();
-            send_distances();
-            break;
+            //not needed in mesh mode
+//        case DWM_SEND_DISTANCES:
+//            dwm_status.tx_state = DWM_SEND_POLL;
+//            dwt_forcetrxoff();
+//            send_distances();
+//            break;
         default:
             //error!!!
             dwm_status.tx_state = DWM_SEND_POLL;
