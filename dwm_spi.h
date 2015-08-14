@@ -45,7 +45,7 @@ typedef enum {
 #define DWT_PRF_64M_RFDLY 514.462f
 
 #define TAG 1
-#define ANCHOR 2
+//#define ANCHOR 2
 
 //#define DW_DEBUG
 //#define DW_CAL_TRX_DELAY

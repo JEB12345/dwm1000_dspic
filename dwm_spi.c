@@ -213,7 +213,9 @@ uint8_t dwm_init(uint8_t node_id, void (*timer_func)(uint16_t microseconds,void 
     
     dwm_reset();
 
-    while(DWM_RESET_IN != 1);
+    while(DWM_RESET_IN != 1){
+        //dwm_reset();
+    }
 
     Delay_us(10); // The PLL clock is not settled after the chip goes into INIT state, a minimum of 5us is needed.
 
@@ -347,40 +349,41 @@ uint8_t dwm_init(uint8_t node_id, void (*timer_func)(uint16_t microseconds,void 
 
     
     
-    if (DW1000_ROLE_TYPE == ANCHOR) {
-	uint8_t eui_array[8];
-
-        // Enable frame filtering
-        dwt_enableframefilter(DWT_FF_DATA_EN | DWT_FF_ACK_EN);
-
-        dw1000_populate_eui(eui_array, ANCHOR_EUI);
-  	dwt_seteui(eui_array);
-        dwt_setpanid(DW1000_PANID);
-
-        // Set more packet constants
-        dw1000_populate_eui(msg.sourceAddr, ANCHOR_EUI);
-        dw1000_populate_eui(fin_msg.sourceAddr, ANCHOR_EUI);
-
-        // hard code destination for now....
-        dw1000_populate_eui(msg.destAddr, TAG_EUI);
-        dw1000_populate_eui(fin_msg.destAddr, TAG_EUI);
-
-        // We do want to enable auto RX
-        dwt_setautorxreenable(1);
-        // Let's do double buffering
-        dwt_setdblrxbuffmode(0);
-        // Disable RX timeout by setting to 0
-        dwt_setrxtimeout(0);
-
-        // Try pre-populating this
-        msg.seqNum++;
-        msg.messageType = MSG_TYPE_ANC_RESP;
-        fin_msg.messageType = MSG_TYPE_ANC_FINAL;
-
-        // Go for receiving
-        dwt_rxenable(0);
-
-    } else if (DW1000_ROLE_TYPE == TAG) {
+//    if (DW1000_ROLE_TYPE == ANCHOR) {
+//	uint8_t eui_array[8];
+//
+//        // Enable frame filtering
+//        dwt_enableframefilter(DWT_FF_DATA_EN | DWT_FF_ACK_EN);
+//
+//        dw1000_populate_eui(eui_array, ANCHOR_EUI);
+//  	dwt_seteui(eui_array);
+//        dwt_setpanid(DW1000_PANID);
+//
+//        // Set more packet constants
+//        dw1000_populate_eui(msg.sourceAddr, ANCHOR_EUI);
+//        dw1000_populate_eui(fin_msg.sourceAddr, ANCHOR_EUI);
+//
+//        // hard code destination for now....
+//        dw1000_populate_eui(msg.destAddr, TAG_EUI);
+//        dw1000_populate_eui(fin_msg.destAddr, TAG_EUI);
+//
+//        // We do want to enable auto RX
+//        dwt_setautorxreenable(1);
+//        // Let's do double buffering
+//        dwt_setdblrxbuffmode(0);
+//        // Disable RX timeout by setting to 0
+//        dwt_setrxtimeout(0);
+//
+//        // Try pre-populating this
+//        msg.seqNum++;
+//        msg.messageType = MSG_TYPE_ANC_RESP;
+//        fin_msg.messageType = MSG_TYPE_ANC_FINAL;
+//
+//        // Go for receiving
+//        dwt_rxenable(0);
+//
+//    } else if (DW1000_ROLE_TYPE == TAG) 
+    {
 	uint8_t eui_array[8];
 
         // First thing we do as a TAG is send the POLL message when the
