@@ -113,6 +113,7 @@ enum dwm_tx_state {
         enum dwm_tx_state   tx_state;
         uint8_t node_id;
         dwt_rxdiag_t rxdiag;
+        uint8_t     new_data_flag; //this flag signifies that a measurement data point has been processed and the CAN PDO should be sent 
     } dwm_1000_status;
 
 #ifdef	__cplusplus

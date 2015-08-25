@@ -746,7 +746,7 @@ void instance_process(){
     }
     
     ctr++;
-    if(ctr>=100){
+    if(ctr>=67){
         ctr = 0;
     }
 }
@@ -971,6 +971,7 @@ void dwt_timer_interrupt()
                 dwm_status.tx_state = DWM_SEND_POLL;
 //            }
             dwm_compute_distances();
+            dwm_status.new_data_flag = 1;
             break;
             //not needed in mesh mode
 //        case DWM_SEND_DISTANCES:
