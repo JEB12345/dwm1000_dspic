@@ -77,8 +77,8 @@ typedef enum {
 #define NUM_CHANNELS 1
 
 #define NUM_FLOATING_NODES  12 //nodes on robot
-#define NUM_FIXED_NODES     4  //fixed nodes (reference)
-#define NUM_TOTAL_NODES     16 //sum of NUM_FLOATING_NODES and NUM_FIXED_NODES
+#define NUM_FIXED_NODES     5  //fixed nodes (reference)
+#define NUM_TOTAL_NODES     17 //sum of NUM_FLOATING_NODES and NUM_FIXED_NODES
 
 
 /*****https://github.com/lab11/polypoint******/
