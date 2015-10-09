@@ -15,6 +15,9 @@
 #include <float.h>
 #include <math.h>
 
+#define TOTAL_RANGE_TIME 80 // Time in ms, e.g. 67ms -> 15Hz
+#define MSG_WAIT_TIME (TOTAL_RANGE_TIME / 3) * 1000 // wait time per message (poll, resp, final) in us
+
 dwm_1000_status dwm_status;
 uint16_t wait_count = 0;
 uint16_t stall_count = 0;
@@ -152,7 +155,7 @@ tag_states tag_state = tag_init;
         uint8_t seqNum;                                   //  sequence_number 02
         uint8_t panID[2];                                 //  PAN ID 03-04
         uint8_t destAddr[2];
-        uint8_t sourceAddr;
+        uint8_t sourceAddr[2];
         uint8_t messageType; //   (application data and any user payload)
 //        uint32_t data[2];
         uint8_t tSP[5];
@@ -676,57 +679,57 @@ void send_final(){
 	dwt_settxantennadelay(TX_ANTENNA_DELAY);
 }
 
-void send_distances()
-{
-     //Reset all the tRRs at the beginning of each event
-	memset(bcast_msg.tRR, 0, sizeof(bcast_msg.tRR));//TODO: hacked
-    
-	// Through tSP (tSF is field after) then +2 for FCS
-    uint16_t tx_frame_length = sizeof(bcast_msg);
-	memset(bcast_msg.destAddr, 0xFF, 2);
-
-	bcast_msg.seqNum++;
-	// First byte identifies this as a POLL
-	bcast_msg.messageType = DWM_SEND_FINAL;//MSG_TYPE_TAG_POLL;
-    
-    bcast_msg.sourceAddr = dwm_status.node_id;
-
-	// Tell the DW1000 about the packet
-	dwt_writetxfctrl(tx_frame_length, 0);
-
-	// We'll get multiple responses, so let them all come in
-	dwt_setrxtimeout(0);
-    
-    uint8_t TimeStamp[5] = {0, 0, 0, 0, 0};
-    dwt_readsystime(TimeStamp);
-    uint64_t systimestamp = from_lower_40_bits(TimeStamp);
-
-    unsigned i;
-    for(i=0;i<NUM_TOTAL_NODES;++i){
-        memcpy(bcast_msg.tRR[i],dwm_status.distance_mm[i],sizeof(uint16_t));
-    }
-    
-    uint32_t delay_time = (uint32_t)((systimestamp)>>8) + ((convertmicrosectodevicetimeu32(FIXED_SEND_DISTANCES_DELAY_US)>>8));
-    
-	delay_time &= 0xFFFFFFFE; //Make sure last bit is zero
-	dwt_setdelayedtrxtime(delay_time);
-    to_lower_40bits(bcast_msg.tSF,systimestamp + (convertmicrosectodevicetimeu(FIXED_SEND_DISTANCES_DELAY_US)));
-	
-	// Write the data
-	dwt_writetxdata(tx_frame_length, (uint8_t*) &bcast_msg, 0);
-
-	// Start the transmission
-	dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
-
-	// MP bug - TX antenna delay needs reprogramming as it is
-	// not preserved
-	dwt_settxantennadelay(TX_ANTENNA_DELAY);
-}
+//void send_distances()
+//{
+//     //Reset all the tRRs at the beginning of each event
+//	memset(bcast_msg.tRR, 0, sizeof(bcast_msg.tRR));//TODO: hacked
+//    
+//	// Through tSP (tSF is field after) then +2 for FCS
+//    uint16_t tx_frame_length = sizeof(bcast_msg);
+//	memset(bcast_msg.destAddr, 0xFF, 2);
+//
+//	bcast_msg.seqNum++;
+//	// First byte identifies this as a POLL
+//	bcast_msg.messageType = DWM_SEND_FINAL;//MSG_TYPE_TAG_POLL;
+//    
+//    bcast_msg.sourceAddr = dwm_status.node_id;
+//
+//	// Tell the DW1000 about the packet
+//	dwt_writetxfctrl(tx_frame_length, 0);
+//
+//	// We'll get multiple responses, so let them all come in
+//	dwt_setrxtimeout(0);
+//    
+//    uint8_t TimeStamp[5] = {0, 0, 0, 0, 0};
+//    dwt_readsystime(TimeStamp);
+//    uint64_t systimestamp = from_lower_40_bits(TimeStamp);
+//
+//    unsigned i;
+//    for(i=0;i<NUM_TOTAL_NODES;++i){
+//        memcpy(bcast_msg.tRR[i],dwm_status.distance_mm[i],sizeof(uint16_t));
+//    }
+//    
+//    uint32_t delay_time = (uint32_t)((systimestamp)>>8) + ((convertmicrosectodevicetimeu32(FIXED_SEND_DISTANCES_DELAY_US)>>8));
+//    
+//	delay_time &= 0xFFFFFFFE; //Make sure last bit is zero
+//	dwt_setdelayedtrxtime(delay_time);
+//    to_lower_40bits(bcast_msg.tSF,systimestamp + (convertmicrosectodevicetimeu(FIXED_SEND_DISTANCES_DELAY_US)));
+//	
+//	// Write the data
+//	dwt_writetxdata(tx_frame_length, (uint8_t*) &bcast_msg, 0);
+//
+//	// Start the transmission
+//	dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
+//
+//	// MP bug - TX antenna delay needs reprogramming as it is
+//	// not preserved
+//	dwt_settxantennadelay(TX_ANTENNA_DELAY);
+//}
 
 void instance_process(){
     static uint16_t ctr = 0;
     if(dwm_status.node_id==0){
-        if(ctr%67==0){ //15Hz
+        if(ctr%TOTAL_RANGE_TIME==0){ 
             //start a new sequence
             //reset state
             memset(global_tag_anchor_resp_rx_time,0x0,sizeof(global_tag_anchor_resp_rx_time));
@@ -741,12 +744,12 @@ void instance_process(){
             
             //kick start state machine
             dwm_status.tx_state = DWM_SEND_RESPONSE;
-            dwm_status.timer_func(20000,dwt_timer_cb);
+            dwm_status.timer_func(MSG_WAIT_TIME,dwt_timer_cb); // Controls the wait time for each message. All messages from all nodes must be received during this absolute window
         }
     }
     
     ctr++;
-    if(ctr>=67){
+    if(ctr>=TOTAL_RANGE_TIME){
         ctr = 0;
     }
 }
