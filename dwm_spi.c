@@ -155,7 +155,7 @@ tag_states tag_state = tag_init;
         uint8_t seqNum;                                   //  sequence_number 02
         uint8_t panID[2];                                 //  PAN ID 03-04
         uint8_t destAddr[2];
-        uint8_t sourceAddr[2];
+        uint8_t sourceAddr;
         uint8_t messageType; //   (application data and any user payload)
 //        uint32_t data[2];
         uint8_t tSP[5];
