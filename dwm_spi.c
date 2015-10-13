@@ -952,19 +952,19 @@ void dwt_timer_interrupt()
             dwm_status.tx_state = DWM_SEND_RESPONSE;
             dwt_forcetrxoff();
             send_poll();
-            dwm_status.timer_func(20000+0*1000*dwm_status.node_id,dwt_timer_cb);
+            dwm_status.timer_func(MSG_WAIT_TIME+0*1000*dwm_status.node_id,dwt_timer_cb);
             break;
         case DWM_SEND_RESPONSE:
             dwm_status.tx_state = DWM_SEND_FINAL;
             dwt_forcetrxoff();
             send_response();
-            dwm_status.timer_func(20000,dwt_timer_cb);
+            dwm_status.timer_func(MSG_WAIT_TIME,dwt_timer_cb);
             break;
         case DWM_SEND_FINAL:
             dwm_status.tx_state = DWM_COMPUTE_TOF;
             dwt_forcetrxoff();
             send_final();
-            dwm_status.timer_func(20000-1000*dwm_status.node_id,dwt_timer_cb);
+            dwm_status.timer_func(MSG_WAIT_TIME-1000*dwm_status.node_id,dwt_timer_cb);
             break;
         case DWM_COMPUTE_TOF:
 //            if(dwm_status.node_id>=NUM_FLOATING_NODES){
