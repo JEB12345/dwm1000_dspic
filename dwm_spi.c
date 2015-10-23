@@ -489,7 +489,7 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                 //start transmit sequence
                 dwm_status.tx_state = DWM_SEND_POLL;
                 //dwm_status.timer_func((dwm_status.node_id-(msg_ptr->sourceAddr))*1000,dwt_timer_cb);
-                dwm_status.timer_func(dwm_status.node_id*1000,dwt_timer_cb);
+                dwm_status.timer_func(1000,dwt_timer_cb);
             }
             //store information contained in and related to poll message  
             global_tRP[msg_ptr->sourceAddr] = from_lower_40_bits(rxtimestamp);
