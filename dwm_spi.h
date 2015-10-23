@@ -96,6 +96,7 @@ typedef struct
 } chConfig_t ;
 
 enum dwm_tx_state {
+        DWM_IDLE,
         DWM_SEND_POLL,
         DWM_SEND_RESPONSE,
         DWM_SEND_FINAL,
