@@ -477,8 +477,8 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
         
         
         if(msg_ptr->messageType == DWM_SEND_POLL){
-            //if((msg_ptr->sourceAddr<dwm_status.node_id) && (dwm_status.tx_state==DWM_IDLE)){ //received poll from first node: start of new sequence
-           if(msg_ptr->sourceAddr==0){ 
+            if((msg_ptr->sourceAddr<dwm_status.node_id) && (dwm_status.tx_state==DWM_IDLE)){ //received poll from first node: start of new sequence
+                
                 //reset state
                 memset(global_tag_anchor_resp_rx_time,0x0,sizeof(global_tag_anchor_resp_rx_time));
                 memset(global_tRR,0x0,sizeof(global_tRR));
@@ -488,8 +488,7 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
                 memset(global_tSF,0x0,sizeof(global_tSF));
                 //start transmit sequence
                 dwm_status.tx_state = DWM_SEND_POLL;
-                //dwm_status.timer_func((dwm_status.node_id-(msg_ptr->sourceAddr))*1000,dwt_timer_cb);
-                dwm_status.timer_func(1000,dwt_timer_cb);
+                dwm_status.timer_func((dwm_status.node_id-(msg_ptr->sourceAddr))*1000,dwt_timer_cb);
             }
             //store information contained in and related to poll message  
             global_tRP[msg_ptr->sourceAddr] = from_lower_40_bits(rxtimestamp);
