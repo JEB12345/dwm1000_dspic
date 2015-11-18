@@ -209,7 +209,7 @@ uint8_t dwm_init(uint8_t node_id, void (*timer_func)(uint16_t microseconds,void 
 
     dwm_status.timer_func = timer_func;
     dwm_status.timer_interrupt = 0; 
-    dwm_status.tx_state = DWM_SEND_POLL;
+    dwm_status.tx_state = DWM_IDLE;
     dwm_status.node_id = node_id;
     memset(dwm_status.distance_mm, 0 ,sizeof(dwm_status.distance_mm));
     memset(dwm_status.distance_mm_fixed, 0 ,sizeof(dwm_status.distance_mm_fixed));
@@ -469,8 +469,8 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
         log10N = log10l(log10N);
         long double rx_qual = log10N-log10FP;
         //Threshold for NLOS
-        if(rx_qual>-4.1175099262876804L){ //10dBm
-        //if(rx_qual>-4.5175099262876808L){ //6dBm//(LIMIT/10-np.log10(2**17)) 
+//        if(rx_qual>-4.1175099262876804L){ //10dBm
+        if(rx_qual>-4.5175099262876808L){ //6dBm//(LIMIT/10-np.log10(2**17)) 
             //probably a reflection, set ignore flag
             global_received_NLOS[msg_ptr->sourceAddr] = 1;
         }
