@@ -477,6 +477,7 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
         
         
         if(msg_ptr->messageType == DWM_SEND_POLL){
+//            if(msg_ptr->sourceAddr==0){
             if((msg_ptr->sourceAddr<dwm_status.node_id) && (dwm_status.tx_state==DWM_IDLE)){ //received poll from first node: start of new sequence
                 
                 //reset state
@@ -514,6 +515,7 @@ void app_dw1000_rxcallback (const dwt_callback_data_t *rxd) {
             }
         } else {
             //unknown message, ignore
+            dwm_status.tx_state = DWM_IDLE;
         }
         
         dwt_forcetrxoff();        

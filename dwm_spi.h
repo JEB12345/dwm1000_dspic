@@ -22,7 +22,7 @@
 #define DWM_RESET_OFF DWM_RESET_TRIS = 1
 
 #define TAG_SEND_POLL_DELAY_US 600 //600
-#define TAG_SEND_FINAL_DELAY_US 600
+#define TAG_SEND_FINAL_DELAY_US 800
 #define FIXED_SEND_DISTANCES_DELAY_US 600
 #define ANC_RESP_DELAY 600
 #define TX_ANTENNA_DELAY 0
@@ -96,12 +96,12 @@ typedef struct
 } chConfig_t ;
 
 enum dwm_tx_state {
-        DWM_IDLE,
-        DWM_SEND_POLL,
-        DWM_SEND_RESPONSE,
-        DWM_SEND_FINAL,
-        DWM_COMPUTE_TOF,
-        DWM_SEND_DISTANCES
+        DWM_IDLE = 0,
+        DWM_SEND_POLL = 1,
+        DWM_SEND_RESPONSE = 2,
+        DWM_SEND_FINAL = 3,
+        DWM_COMPUTE_TOF = 4,
+        DWM_SEND_DISTANCES = 5
     } ;
 
     typedef struct {
